@@ -3,13 +3,17 @@ WordtoPDF 工具
 
 
 ![功能演示](./assets\images\image.png)
+
 🌟 核心功能
 功能模块	说明
 多格式支持	兼容 .doc/.docx/.docm/.dotx/.dotm/.odt/.rtf 等主流Word格式
-智能目录识别	自动解析两级文件夹结构：
+
+智能目录识别
+自动解析两级文件夹结构：
 父级/子级/文档级	
 一键批量转换	支持单文件/多文件批量处理，保留原始目录层级
 路径智能管理	导出路径自动复制导入位置，支持自定义修改
+
 🛠️ 技术亮点
 graph TD
     A[用户选择文件] --> B{文件类型检测}
@@ -18,18 +22,17 @@ graph TD
     C --> E[选择输出目录]
     E --> F[启动转换引擎]
     F --> G[生成带书签的PDF]
+
 📁 目录结构规范
 WordtoPDF/
 ├── assets/        # 资源文件（图标、截图）
 │   └── images/    # 所有图片集中存放
 
-⚙️ 使用指南
-1. 快速开始
-# 第一次运行自动创建配置文件夹
-python app.py --init
 
-# 批量转换命令行（需安装后激活虚拟环境）
-python app.py convert "D:/文档" --output "D:/PDF输出"
+⚙️ 使用指南
+
+1. 快速开始
+
 2. 文件夹结构示例
 输入目录：
 ├── 父级项目/
@@ -37,6 +40,7 @@ python app.py convert "D:/文档" --output "D:/PDF输出"
 │   │   ├── 文档A.docx
 │   │   └── 文档B.odt
 │   └── 其他文件.txt
+
 输出目录：
 └── PDF输出/
     ├── 父级项目/
@@ -44,6 +48,7 @@ python app.py convert "D:/文档" --output "D:/PDF输出"
     │   │   ├── 文档A.pdf
     │   │   └── 文档B.pdf
     └── 其他文件.pdf
+
 🎨 视觉设计建议
 主界面布局
 assets/layout-sketch.png
@@ -53,6 +58,7 @@ assets/layout-sketch.png
 
 成功状态：绿色勾选图标 + "转换完成！" 弹窗
 错误状态：红色警告图标 + 具体错误代码（如 ERROR-001：文件格式不支持）
+
 📝 用户手册模板
 
 # WordtoPDF 用户手册 v1.2
