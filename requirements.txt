@@ -1,4 +1,8 @@
 streamlit
+pandas
+openpyxl
+python-docx
+beautifulsoup4
 pypandoc
 docx2pdf
 comtypes

@@ -20,7 +20,7 @@ with col1:
     </div>
     """, unsafe_allow_html=True)
     if st.button("使用工具", key="tool1", use_container_width=True):
-        st.info("该功能正在开发中...")
+        st.switch_page("pages/文档格式转换.py")
 
 with col2:
     st.markdown("""

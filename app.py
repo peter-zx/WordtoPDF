@@ -74,7 +74,8 @@ with st.sidebar:
     # 其他工具(预留)
     st.markdown('<div class="nav-section">', unsafe_allow_html=True)
     st.markdown('<div class="nav-section-title">其他工具</div>', unsafe_allow_html=True)
-    st.button("📄 文档格式转换", use_container_width=True, disabled=True)
+    if st.button("📄 文档格式转换", use_container_width=True):
+        st.switch_page("pages/文档格式转换.py")
     st.button("📑 批量PDF转换", use_container_width=True, disabled=True)
     st.button("🔧 更多工具", use_container_width=True, disabled=True)
     st.markdown('</div>', unsafe_allow_html=True)
