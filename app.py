@@ -58,27 +58,12 @@ with st.sidebar:
     st.markdown('<div class="custom-nav-title">📂 导航菜单</div>', unsafe_allow_html=True)
 
     # 主页
-    st.markdown('<div class="nav-section">', unsafe_allow_html=True)
-    st.markdown('<div class="nav-section-title">主页</div>', unsafe_allow_html=True)
     if st.button("📁 文件夹生成", use_container_width=True, type="primary"):
         st.switch_page("pages/文件夹生成.py")
-    st.markdown('</div>', unsafe_allow_html=True)
 
     # 工具箱
-    st.markdown('<div class="nav-section">', unsafe_allow_html=True)
-    st.markdown('<div class="nav-section-title">工具箱</div>', unsafe_allow_html=True)
     if st.button("🛠️ 工具箱", use_container_width=True):
         st.switch_page("pages/工具箱.py")
-    st.markdown('</div>', unsafe_allow_html=True)
-
-    # 其他工具(预留)
-    st.markdown('<div class="nav-section">', unsafe_allow_html=True)
-    st.markdown('<div class="nav-section-title">其他工具</div>', unsafe_allow_html=True)
-    if st.button("📄 文档格式转换", use_container_width=True):
-        st.switch_page("pages/文档格式转换.py")
-    st.button("📑 批量PDF转换", use_container_width=True, disabled=True)
-    st.button("🔧 更多工具", use_container_width=True, disabled=True)
-    st.markdown('</div>', unsafe_allow_html=True)
 
     st.markdown('</div>', unsafe_allow_html=True)
 
