@@ -1,17 +1,18 @@
 """
-批量DOCX转PDF服务 - Word本地版本
-使用Word COM接口，优化的分批处理方案
+批量DOCX转PDF服务 - 单文件单进程版本
+每个文件独立启动Word进程，转换完立即关闭
 """
 
 import os
 import sys
 import time
+import subprocess
 from typing import List, Tuple, Dict
 from pathlib import Path
 
 
 class BatchPDFService:
-    """批量DOCX转PDF服务 - Word本地版本"""
+    """批量DOCX转PDF服务 - 单文件单进程版本"""
 
     @staticmethod
     def scan_folder_structure(folder_path: str) -> Dict:
@@ -56,48 +57,118 @@ class BatchPDFService:
         return files
 
     @staticmethod
-    def convert_with_word(input_path: str, output_path: str, word_app) -> Tuple[bool, str]:
+    def convert_single_file(input_path: str, output_path: str) -> Tuple[bool, str]:
         """
-        使用Word应用实例转换文件
+        转换单个文件 - 使用独立Word进程
 
         Args:
             input_path: 输入DOCX文件路径
             output_path: 输出PDF文件路径
-            word_app: Word应用实例
 
         Returns:
             (成功标志, 错误信息)
         """
+        # 创建一个Python脚本文件来执行转换
+        script_content = f'''
+import sys
+import os
+import win32com.client
+import time
+
+try:
+    # 创建Word实例
+    word = win32com.client.Dispatch("Word.Application")
+    word.Visible = False
+    word.DisplayAlerts = False
+    
+    # 打开文档
+    doc = word.Documents.Open(r"{input_path}", ReadOnly=True, Visible=False)
+    
+    # 保存为PDF
+    doc.SaveAs(r"{output_path}", FileFormat=17)
+    
+    # 关闭文档
+    doc.Close()
+    
+    # 关闭Word
+    word.Quit()
+    
+    # 等待Word完全退出
+    time.sleep(1)
+    
+    print("SUCCESS")
+    sys.exit(0)
+    
+except Exception as e:
+    print(f"ERROR: {{str(e)}}")
+    # 尝试关闭Word
+    try:
+        if 'word' in locals():
+            word.Quit()
+    except:
+        pass
+    sys.exit(1)
+'''
+
+        # 写入临时脚本
+        script_path = os.path.join(os.path.dirname(output_path), "convert_script.py")
+        with open(script_path, 'w', encoding='utf-8') as f:
+            f.write(script_content)
+
         try:
-            # 打开DOCX文件
-            doc = word_app.Documents.Open(input_path, ReadOnly=True, Visible=False)
+            # 执行脚本
+            result = subprocess.run(
+                [sys.executable, script_path],
+                capture_output=True,
+                text=True,
+                timeout=30,
+                creationflags=subprocess.CREATE_NO_WINDOW
+            )
 
-            # 保存为PDF格式
-            doc.SaveAs(output_path, FileFormat=17)  # 17 = PDF format
+            # 清理临时脚本
+            try:
+                os.remove(script_path)
+            except:
+                pass
 
-            # 关闭文档
-            doc.Close()
+            if result.returncode == 0 and "SUCCESS" in result.stdout:
+                if os.path.exists(output_path):
+                    return True, ""
+                else:
+                    return False, "输出文件未生成"
+            else:
+                error_msg = result.stderr or result.stdout or "未知错误"
+                return False, error_msg
 
-            return True, ""
+        except subprocess.TimeoutExpired:
+            # 超时，清理脚本
+            try:
+                os.remove(script_path)
+            except:
+                pass
+            return False, "转换超时"
 
         except Exception as e:
+            # 清理脚本
+            try:
+                os.remove(script_path)
+            except:
+                pass
             return False, str(e)
 
     @staticmethod
     def batch_convert_with_structure(
         structure: Dict,
         output_base_dir: str,
-        progress_callback=None,
-        batch_size: int = 5
+        progress_callback=None
     ) -> List[dict]:
         """
-        批量转换DOCX文件,保持文件夹结构（Word本地优化版本）
+        批量转换DOCX文件,保持文件夹结构（单文件单进程版本）
 
         Args:
             structure: 文件夹结构
             output_base_dir: 输出基础目录
             progress_callback: 进度回调函数
-            batch_size: 每批处理的文件数量（默认5，确保稳定性）
 
         Returns:
             转换结果列表
@@ -118,89 +189,57 @@ class BatchPDFService:
         top_output_dir = os.path.join(output_base_dir, top_folder_name)
         os.makedirs(top_output_dir, exist_ok=True)
 
-        # 分批处理（每批5个文件，确保稳定性）
-        for batch_start in range(0, total, batch_size):
-            batch_end = min(batch_start + batch_size, total)
-            batch_files = all_files[batch_start:batch_end]
-
-            word_app = None
-
+        # 逐个处理文件
+        for index, file_info in enumerate(all_files, 1):
             try:
-                # 为当前批次创建新的Word实例
-                import win32com.client
-                word_app = win32com.client.Dispatch("Word.Application")
-                word_app.Visible = False
-                word_app.DisplayAlerts = False
+                # 计算相对路径
+                relative_path = file_info["relative_path"]
 
-                # 处理当前批次
-                for i, file_info in enumerate(batch_files):
-                    index = batch_start + i + 1
+                # 保持文件夹结构，添加顶层文件夹
+                relative_dir = os.path.dirname(relative_path)
+                output_dir = os.path.join(top_output_dir, relative_dir)
 
-                    try:
-                        # 计算相对路径
-                        relative_path = file_info["relative_path"]
+                # 确保输出目录存在
+                os.makedirs(output_dir, exist_ok=True)
 
-                        # 保持文件夹结构，添加顶层文件夹
-                        relative_dir = os.path.dirname(relative_path)
-                        output_dir = os.path.join(top_output_dir, relative_dir)
+                # 生成输出文件名
+                input_name = Path(file_info["name"]).stem
+                output_file = os.path.join(output_dir, f"{input_name}.pdf")
 
-                        # 确保输出目录存在
-                        os.makedirs(output_dir, exist_ok=True)
+                # 转换文件（独立进程）
+                success, error = BatchPDFService.convert_single_file(
+                    file_info["path"],
+                    output_file
+                )
 
-                        # 生成输出文件名
-                        input_name = Path(file_info["name"]).stem
-                        output_file = os.path.join(output_dir, f"{input_name}.pdf")
+                result = {
+                    "input_file": file_info["path"],
+                    "output_file": output_file if success else None,
+                    "relative_path": relative_path,
+                    "success": success,
+                    "error": error if not success else None
+                }
+                results.append(result)
 
-                        # 转换文件
-                        success, error = BatchPDFService.convert_with_word(
-                            file_info["path"],
-                            output_file,
-                            word_app
-                        )
+                # 调用进度回调
+                if progress_callback:
+                    progress_callback(index, total, result)
 
-                        result = {
-                            "input_file": file_info["path"],
-                            "output_file": output_file if success else None,
-                            "relative_path": relative_path,
-                            "success": success,
-                            "error": error if not success else None
-                        }
-                        results.append(result)
+                # 文件间延迟，避免进程冲突
+                time.sleep(1.5)
 
-                        # 调用进度回调
-                        if progress_callback:
-                            progress_callback(index, total, result)
+            except Exception as e:
+                result = {
+                    "input_file": file_info["path"],
+                    "output_file": None,
+                    "relative_path": file_info.get("relative_path", ""),
+                    "success": False,
+                    "error": str(e)
+                }
+                results.append(result)
 
-                        # 文件间稍作延迟
-                        time.sleep(0.5)
-
-                    except Exception as e:
-                        result = {
-                            "input_file": file_info["path"],
-                            "output_file": None,
-                            "relative_path": file_info.get("relative_path", ""),
-                            "success": False,
-                            "error": str(e)
-                        }
-                        results.append(result)
-
-                        if progress_callback:
-                            progress_callback(index, total, result)
-
-            finally:
-                # 确保关闭Word应用
-                if word_app is not None:
-                    try:
-                        word_app.Quit()
-                    except:
-                        pass
-
-                    # 等待Word完全关闭
-                    time.sleep(1)
-
-            # 批次间稍作延迟，让系统休息
-            if batch_end < total:
-                time.sleep(2)
+                if progress_callback:
+                    progress_callback(index, total, result)
 
         return results
 
@@ -208,17 +247,15 @@ class BatchPDFService:
     def batch_convert_docx_to_pdf(
         input_files: List[str],
         output_dir: str,
-        progress_callback=None,
-        batch_size: int = 5
+        progress_callback=None
     ) -> List[dict]:
         """
-        批量将DOCX文件转换为PDF（Word本地优化版本）
+        批量将DOCX文件转换为PDF（单文件单进程版本）
 
         Args:
             input_files: 输入DOCX文件路径列表
             output_dir: 输出目录
             progress_callback: 进度回调函数
-            batch_size: 每批处理的文件数量
 
         Returns:
             转换结果列表
@@ -232,77 +269,45 @@ class BatchPDFService:
         # 确保输出目录存在
         os.makedirs(output_dir, exist_ok=True)
 
-        # 分批处理
-        for batch_start in range(0, total, batch_size):
-            batch_end = min(batch_start + batch_size, total)
-            batch_files = input_files[batch_start:batch_end]
-
-            word_app = None
-
+        # 逐个处理文件
+        for index, input_file in enumerate(input_files, 1):
             try:
-                # 为当前批次创建新的Word实例
-                import win32com.client
-                word_app = win32com.client.Dispatch("Word.Application")
-                word_app.Visible = False
-                word_app.DisplayAlerts = False
+                # 生成输出文件名
+                input_name = Path(input_file).stem
+                output_file = os.path.join(output_dir, f"{input_name}.pdf")
 
-                # 处理当前批次
-                for i, input_file in enumerate(batch_files):
-                    index = batch_start + i + 1
+                # 转换文件（独立进程）
+                success, error = BatchPDFService.convert_single_file(
+                    input_file,
+                    output_file
+                )
 
-                    try:
-                        # 生成输出文件名
-                        input_name = Path(input_file).stem
-                        output_file = os.path.join(output_dir, f"{input_name}.pdf")
+                result = {
+                    "input_file": input_file,
+                    "output_file": output_file if success else None,
+                    "success": success,
+                    "error": error if not success else None
+                }
+                results.append(result)
 
-                        # 转换文件
-                        success, error = BatchPDFService.convert_with_word(
-                            input_file,
-                            output_file,
-                            word_app
-                        )
+                # 调用进度回调
+                if progress_callback:
+                    progress_callback(index, total, result)
 
-                        result = {
-                            "input_file": input_file,
-                            "output_file": output_file if success else None,
-                            "success": success,
-                            "error": error if not success else None
-                        }
-                        results.append(result)
+                # 文件间延迟
+                time.sleep(1.5)
 
-                        # 调用进度回调
-                        if progress_callback:
-                            progress_callback(index, total, result)
+            except Exception as e:
+                result = {
+                    "input_file": input_file,
+                    "output_file": None,
+                    "success": False,
+                    "error": str(e)
+                }
+                results.append(result)
 
-                        # 文件间稍作延迟
-                        time.sleep(0.5)
-
-                    except Exception as e:
-                        result = {
-                            "input_file": input_file,
-                            "output_file": None,
-                            "success": False,
-                            "error": str(e)
-                        }
-                        results.append(result)
-
-                        if progress_callback:
-                            progress_callback(index, total, result)
-
-            finally:
-                # 确保关闭Word应用
-                if word_app is not None:
-                    try:
-                        word_app.Quit()
-                    except:
-                        pass
-
-                    # 等待Word完全关闭
-                    time.sleep(1)
-
-            # 批次间稍作延迟
-            if batch_end < total:
-                time.sleep(2)
+                if progress_callback:
+                    progress_callback(index, total, result)
 
         return results
 
