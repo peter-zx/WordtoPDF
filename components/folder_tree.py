@@ -1,187 +1,224 @@
 """
-文件夹树组件 - 可视化选择文件夹
+文件夹树组件 - 使用callback模式，正确处理状态
 """
 
 import streamlit as st
-from typing import Dict, List, Set
+from typing import Dict, List
+import json
+import os
+import tempfile
 
 
 class FolderTreeComponent:
-    """文件夹树组件"""
+    """文件夹树组件 - callback模式"""
 
-    def __init__(self):
-        """初始化组件"""
-        pass
+    _cache_file = None
 
     @staticmethod
-    def render_folder_tree(
-        structure: Dict,
-        selected_files: Set[str],
-        level: int = 0
-    ) -> Set[str]:
-        """
-        渲染文件夹树，返回选中的文件列表
-
-        Args:
-            structure: 文件夹结构
-            selected_files: 已选中的文件集合
-            level: 缩进级别
-
-        Returns:
-            选中的文件集合
-        """
-        indent = "　" * level
-
-        # 渲染当前文件夹
-        folder_name = structure["name"]
-
-        # 检查当前文件夹下的所有文件
-        all_files = FolderTreeComponent._get_all_files_in_folder(structure)
-
-        # 检查当前文件夹是否全部选中
-        all_selected = all(
-            file_info["path"] in selected_files
-            for file_info in all_files
-        )
-
-        # 检查当前文件夹是否部分选中
-        some_selected = any(
-            file_info["path"] in selected_files
-            for file_info in all_files
-        )
-
-        # 文件夹复选框
-        if all_selected:
-            folder_key = f"folder_{structure['path']}"
-            folder_checked = st.checkbox(
-                f"📁 {indent}{folder_name}",
-                value=True,
-                key=folder_key,
-                help=f"包含 {len(all_files)} 个文件"
+    def _get_cache_file() -> str:
+        if FolderTreeComponent._cache_file is None:
+            FolderTreeComponent._cache_file = os.path.join(
+                tempfile.gettempdir(), "pdf_converter_selected.json"
             )
-
-            if not folder_checked:
-                # 取消选中，移除所有文件
-                for file_info in all_files:
-                    selected_files.discard(file_info["path"])
-
-        elif some_selected:
-            # 部分选中，显示半选中状态（通过文本标记）
-            st.markdown(f"📁 {indent}{folder_name} ⚠️ (部分选中: {sum(1 for f in all_files if f['path'] in selected_files)}/{len(all_files)})")
-
-            # 提供全选/取消全选按钮
-            col1, col2 = st.columns(2)
-            with col1:
-                if st.button(f"全选", key=f"select_all_{structure['path']}"):
-                    for file_info in all_files:
-                        selected_files.add(file_info["path"])
-                    st.rerun()
-
-            with col2:
-                if st.button(f"取消", key=f"clear_{structure['path']}"):
-                    for file_info in all_files:
-                        selected_files.discard(file_info["path"])
-                    st.rerun()
-
-        else:
-            # 未选中
-            col1, col2 = st.columns([4, 1])
-            with col1:
-                st.markdown(f"📁 {indent}{folder_name}")
-            with col2:
-                if st.button("全选", key=f"select_all_{structure['path']}", use_container_width=True):
-                    for file_info in all_files:
-                        selected_files.add(file_info["path"])
-                    st.rerun()
-
-        # 渲染当前文件夹的文件
-        if structure.get("docx_files"):
-            for file_info in structure["docx_files"]:
-                file_key = f"file_{file_info['path']}"
-                is_selected = file_info["path"] in selected_files
-
-                if is_selected:
-                    checked = st.checkbox(
-                        f"📄 {indent}　{file_info['name']}",
-                        value=True,
-                        key=file_key
-                    )
-                    if not checked:
-                        selected_files.discard(file_info["path"])
-                else:
-                    checked = st.checkbox(
-                        f"📄 {indent}　{file_info['name']}",
-                        value=False,
-                        key=file_key
-                    )
-                    if checked:
-                        selected_files.add(file_info["path"])
-
-        # 递归渲染子文件夹
-        for child in structure.get("children", []):
-            selected_files = FolderTreeComponent.render_folder_tree(
-                child,
-                selected_files,
-                level + 1
-            )
-
-        return selected_files
+        return FolderTreeComponent._cache_file
 
     @staticmethod
-    def _get_all_files_in_folder(structure: Dict) -> List[Dict]:
-        """获取文件夹及其子文件夹中的所有文件"""
-        files = []
-
-        # 添加当前文件夹的文件
-        files.extend(structure.get("docx_files", []))
-
-        # 递归添加子文件夹的文件
-        for child in structure.get("children", []):
-            files.extend(FolderTreeComponent._get_all_files_in_folder(child))
-
-        return files
+    def _load_selected() -> dict:
+        """加载选择状态 - 返回 {path: bool} 字典"""
+        try:
+            cache_file = FolderTreeComponent._get_cache_file()
+            if os.path.exists(cache_file):
+                with open(cache_file, 'r', encoding='utf-8') as f:
+                    data = json.load(f)
+                    return data if isinstance(data, dict) else {}
+        except:
+            pass
+        return {}
 
     @staticmethod
-    def render_selection_controls(
-        structure: Dict,
-        selected_files: Set[str]
-    ):
-        """
-        渲染选择控制按钮（全选/反选/清空）
+    def _save_selected(selected_dict: dict):
+        """保存选择状态"""
+        try:
+            cache_file = FolderTreeComponent._get_cache_file()
+            with open(cache_file, 'w', encoding='utf-8') as f:
+                json.dump(selected_dict, f)
+        except:
+            pass
 
-        Args:
-            structure: 文件夹结构
-            selected_files: 已选中的文件集合
-        """
-        all_files = FolderTreeComponent._get_all_files_in_folder(structure)
+    @staticmethod
+    def get_selected_files() -> List[str]:
+        """获取选中的文件路径列表"""
+        selected_dict = FolderTreeComponent._load_selected()
+        return [path for path, checked in selected_dict.items() if checked]
+
+    @staticmethod
+    def clear_cache():
+        """清除所有选择"""
+        FolderTreeComponent._save_selected({})
+
+    @staticmethod
+    def _get_all_file_paths(structure: Dict) -> List[str]:
+        """获取所有文件路径"""
+        paths = []
+        for f in structure.get("docx_files", []):
+            paths.append(f["path"])
+        for child in structure.get("children", []):
+            paths.extend(FolderTreeComponent._get_all_file_paths(child))
+        return paths
+
+    @staticmethod
+    def render_selection_controls(structure: Dict):
+        """渲染控制按钮"""
+        all_paths = FolderTreeComponent._get_all_file_paths(structure)
+        total = len(all_paths)
+        
+        # 从缓存加载
+        selected_dict = FolderTreeComponent._load_selected()
+        selected_count = sum(1 for p in all_paths if selected_dict.get(p, False))
 
         col1, col2, col3, col4 = st.columns([1, 1, 1, 2])
 
         with col1:
-            if st.button("全选", key="select_all_global"):
-                for file_info in all_files:
-                    selected_files.add(file_info["path"])
+            if st.button("全选", key="btn_all", use_container_width=True):
+                # 全选：所有文件设为True
+                new_dict = {p: True for p in all_paths}
+                FolderTreeComponent._save_selected(new_dict)
                 st.rerun()
 
         with col2:
-            if st.button("反选", key="invert_selection"):
-                for file_info in all_files:
-                    if file_info["path"] in selected_files:
-                        selected_files.discard(file_info["path"])
-                    else:
-                        selected_files.add(file_info["path"])
+            if st.button("反选", key="btn_invert", use_container_width=True):
+                # 反选
+                new_dict = {}
+                for p in all_paths:
+                    new_dict[p] = not selected_dict.get(p, False)
+                FolderTreeComponent._save_selected(new_dict)
                 st.rerun()
 
         with col3:
-            if st.button("清空", key="clear_all"):
-                selected_files.clear()
+            if st.button("清空", key="btn_clear", use_container_width=True):
+                # 清空：所有文件设为False
+                new_dict = {p: False for p in all_paths}
+                FolderTreeComponent._save_selected(new_dict)
                 st.rerun()
 
         with col4:
-            selected_count = len(selected_files)
-            total_count = len(all_files)
-            st.metric(
-                "已选择",
-                f"{selected_count}/{total_count}",
-                delta=f"{selected_count} 文件"
-            )
+            st.metric("已选择文件", f"{selected_count}/{total}")
+
+    @staticmethod
+    def render_folder_tree(structure: Dict) -> None:
+        """渲染文件夹树"""
+        # 注入样式
+        st.markdown("""
+        <style>
+            .stCheckbox > label { font-size: 13px !important; }
+            .stCheckbox { margin: 0 !important; padding: 0 !important; }
+            div[data-testid="stExpander"] { margin: 2px 0 !important; }
+            .streamlit-expanderHeader { font-size: 13px !important; padding: 4px !important; }
+            .streamlit-expanderContent { padding: 0 0 0 16px !important; border-left: 2px solid #ddd !important; }
+        </style>
+        """, unsafe_allow_html=True)
+
+        # 加载当前状态
+        selected_dict = FolderTreeComponent._load_selected()
+
+        # 渲染根目录文件
+        for f in structure.get("docx_files", []):
+            selected_dict = FolderTreeComponent._render_file(f, selected_dict)
+
+        # 渲染子文件夹
+        for idx, child in enumerate(structure.get("children", [])):
+            selected_dict = FolderTreeComponent._render_folder(child, selected_dict, 0, idx)
+
+        # 保存最终状态
+        FolderTreeComponent._save_selected(selected_dict)
+
+    @staticmethod
+    def _render_file(file_info: Dict, selected_dict: dict) -> dict:
+        """渲染单个文件"""
+        file_path = file_info["path"]
+        is_checked = selected_dict.get(file_path, False)
+
+        # 使用callback处理变化
+        def on_change():
+            current = FolderTreeComponent._load_selected()
+            current[file_path] = st.session_state.get(f"cb_{hash(file_path) % 999999}", False)
+            FolderTreeComponent._save_selected(current)
+
+        key = f"cb_{hash(file_path) % 999999}"
+        checked = st.checkbox(
+            f"📄 {file_info['name']}", 
+            value=is_checked, 
+            key=key,
+            on_change=on_change
+        )
+
+        # 更新字典
+        selected_dict[file_path] = checked
+        return selected_dict
+
+    @staticmethod
+    def _render_folder(structure: Dict, selected_dict: dict, level: int, idx: int) -> dict:
+        """渲染文件夹"""
+        folder_name = structure["name"]
+        folder_path = structure["path"]
+
+        # 获取该文件夹下所有文件
+        all_paths = FolderTreeComponent._get_all_file_paths(structure)
+        total = len(all_paths)
+        
+        # 计算选中数量
+        selected_count = sum(1 for p in all_paths if selected_dict.get(p, False))
+
+        # 状态显示
+        if selected_count == total and total > 0:
+            status = "✅"
+            folder_checked = True
+        elif selected_count > 0:
+            status = f"({selected_count}/{total})"
+            folder_checked = False
+        else:
+            status = f"({total})"
+            folder_checked = False
+
+        indent = "　" * level
+
+        # 文件夹checkbox - 使用callback
+        def on_folder_change():
+            current = FolderTreeComponent._load_selected()
+            key = f"fld_{level}_{idx}_{hash(folder_path) % 999999}"
+            new_checked = st.session_state.get(key, False)
+            # 更新所有子文件
+            for p in all_paths:
+                current[p] = new_checked
+            FolderTreeComponent._save_selected(current)
+
+        key = f"fld_{level}_{idx}_{hash(folder_path) % 999999}"
+        new_checked = st.checkbox(
+            f"{indent}📁 {folder_name} {status}",
+            value=folder_checked,
+            key=key,
+            on_change=on_folder_change
+        )
+
+        # 更新字典（用于当前渲染）
+        if new_checked != folder_checked:
+            for p in all_paths:
+                selected_dict[p] = new_checked
+
+        # 渲染内容
+        has_content = structure.get("docx_files") or structure.get("children")
+        if has_content:
+            expanded = selected_count > 0
+
+            with st.expander("▼", expanded=expanded):
+                # 渲染文件
+                for f in structure.get("docx_files", []):
+                    selected_dict = FolderTreeComponent._render_file(f, selected_dict)
+
+                # 递归渲染子文件夹
+                for child_idx, child in enumerate(structure.get("children", [])):
+                    selected_dict = FolderTreeComponent._render_folder(
+                        child, selected_dict, level + 1, child_idx
+                    )
+
+        return selected_dict
