@@ -1,5 +1,5 @@
 """
-文件夹树组件 - 使用callback模式，正确处理状态
+文件夹树组件 - 严格按照架构实现
 """
 
 import streamlit as st
@@ -10,7 +10,7 @@ import tempfile
 
 
 class FolderTreeComponent:
-    """文件夹树组件 - callback模式"""
+    """文件夹树组件 - 严格架构实现"""
 
     _cache_file = None
 
@@ -24,7 +24,7 @@ class FolderTreeComponent:
 
     @staticmethod
     def _load_selected() -> dict:
-        """加载选择状态 - 返回 {path: bool} 字典"""
+        """加载状态字典 - 返回 {path: bool}"""
         try:
             cache_file = FolderTreeComponent._get_cache_file()
             if os.path.exists(cache_file):
@@ -37,7 +37,7 @@ class FolderTreeComponent:
 
     @staticmethod
     def _save_selected(selected_dict: dict):
-        """保存选择状态"""
+        """保存状态字典"""
         try:
             cache_file = FolderTreeComponent._get_cache_file()
             with open(cache_file, 'w', encoding='utf-8') as f:
@@ -47,7 +47,7 @@ class FolderTreeComponent:
 
     @staticmethod
     def get_selected_files() -> List[str]:
-        """获取选中的文件路径列表"""
+        """获取选中文件列表"""
         selected_dict = FolderTreeComponent._load_selected()
         return [path for path, checked in selected_dict.items() if checked]
 
@@ -72,7 +72,6 @@ class FolderTreeComponent:
         all_paths = FolderTreeComponent._get_all_file_paths(structure)
         total = len(all_paths)
         
-        # 从缓存加载
         selected_dict = FolderTreeComponent._load_selected()
         selected_count = sum(1 for p in all_paths if selected_dict.get(p, False))
 
@@ -118,58 +117,60 @@ class FolderTreeComponent:
         </style>
         """, unsafe_allow_html=True)
 
-        # 加载当前状态
-        selected_dict = FolderTreeComponent._load_selected()
-
         # 渲染根目录文件
         for f in structure.get("docx_files", []):
-            selected_dict = FolderTreeComponent._render_file(f, selected_dict)
+            FolderTreeComponent._render_file(f)
 
         # 渲染子文件夹
         for idx, child in enumerate(structure.get("children", [])):
-            selected_dict = FolderTreeComponent._render_folder(child, selected_dict, 0, idx)
-
-        # 保存最终状态
-        FolderTreeComponent._save_selected(selected_dict)
+            FolderTreeComponent._render_folder(child, 0, idx)
 
     @staticmethod
-    def _render_file(file_info: Dict, selected_dict: dict) -> dict:
-        """渲染单个文件"""
+    def _render_file(file_info: Dict) -> None:
+        """渲染单个文件 - 使用callback"""
         file_path = file_info["path"]
+        file_name = file_info["name"]
+        
+        # 从缓存加载当前状态
+        selected_dict = FolderTreeComponent._load_selected()
         is_checked = selected_dict.get(file_path, False)
-
-        # 使用callback处理变化
-        def on_change():
+        
+        # 定义callback函数
+        def on_file_change():
+            # 获取当前状态
             current = FolderTreeComponent._load_selected()
-            current[file_path] = st.session_state.get(f"cb_{hash(file_path) % 999999}", False)
+            # 获取checkbox的新值
+            new_value = st.session_state[file_key]
+            # 更新字典
+            current[file_path] = new_value
+            # 保存到文件
             FolderTreeComponent._save_selected(current)
-
-        key = f"cb_{hash(file_path) % 999999}"
-        checked = st.checkbox(
-            f"📄 {file_info['name']}", 
+        
+        file_key = f"file_cb_{hash(file_path) % 999999}"
+        
+        # 渲染checkbox，使用callback
+        st.checkbox(
+            f"📄 {file_name}", 
             value=is_checked, 
-            key=key,
-            on_change=on_change
+            key=file_key,
+            on_change=on_file_change
         )
 
-        # 更新字典
-        selected_dict[file_path] = checked
-        return selected_dict
-
     @staticmethod
-    def _render_folder(structure: Dict, selected_dict: dict, level: int, idx: int) -> dict:
-        """渲染文件夹"""
+    def _render_folder(structure: Dict, level: int, idx: int) -> None:
+        """渲染文件夹 - 使用callback"""
         folder_name = structure["name"]
         folder_path = structure["path"]
 
-        # 获取该文件夹下所有文件
+        # 获取该文件夹下所有文件路径
         all_paths = FolderTreeComponent._get_all_file_paths(structure)
         total = len(all_paths)
         
-        # 计算选中数量
+        # 从缓存加载状态
+        selected_dict = FolderTreeComponent._load_selected()
         selected_count = sum(1 for p in all_paths if selected_dict.get(p, False))
 
-        # 状态显示
+        # 计算文件夹选中状态
         if selected_count == total and total > 0:
             status = "✅"
             folder_checked = True
@@ -181,44 +182,39 @@ class FolderTreeComponent:
             folder_checked = False
 
         indent = "　" * level
+        folder_key = f"folder_cb_{level}_{idx}_{hash(folder_path) % 999999}"
 
-        # 文件夹checkbox - 使用callback
+        # 定义callback函数
         def on_folder_change():
+            # 获取当前状态
             current = FolderTreeComponent._load_selected()
-            key = f"fld_{level}_{idx}_{hash(folder_path) % 999999}"
-            new_checked = st.session_state.get(key, False)
+            # 获取checkbox的新值
+            new_value = st.session_state[folder_key]
             # 更新所有子文件
             for p in all_paths:
-                current[p] = new_checked
+                current[p] = new_value
+            # 保存到文件
             FolderTreeComponent._save_selected(current)
-
-        key = f"fld_{level}_{idx}_{hash(folder_path) % 999999}"
-        new_checked = st.checkbox(
+        
+        # 渲染文件夹checkbox，使用callback
+        st.checkbox(
             f"{indent}📁 {folder_name} {status}",
             value=folder_checked,
-            key=key,
+            key=folder_key,
             on_change=on_folder_change
         )
-
-        # 更新字典（用于当前渲染）
-        if new_checked != folder_checked:
-            for p in all_paths:
-                selected_dict[p] = new_checked
 
         # 渲染内容
         has_content = structure.get("docx_files") or structure.get("children")
         if has_content:
+            # 有选中内容时展开
             expanded = selected_count > 0
 
             with st.expander("▼", expanded=expanded):
                 # 渲染文件
                 for f in structure.get("docx_files", []):
-                    selected_dict = FolderTreeComponent._render_file(f, selected_dict)
+                    FolderTreeComponent._render_file(f)
 
                 # 递归渲染子文件夹
                 for child_idx, child in enumerate(structure.get("children", [])):
-                    selected_dict = FolderTreeComponent._render_folder(
-                        child, selected_dict, level + 1, child_idx
-                    )
-
-        return selected_dict
+                    FolderTreeComponent._render_folder(child, level + 1, child_idx)
