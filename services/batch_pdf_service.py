@@ -1,6 +1,6 @@
 """
-批量DOCX转PDF服务 - 单文件单进程版本
-每个文件独立启动Word进程，转换完立即关闭
+批量DOCX转PDF服务 - 最简单串行版本
+一个接一个转换，不并发，最简单最稳定
 """
 
 import os
@@ -12,7 +12,7 @@ from pathlib import Path
 
 
 class BatchPDFService:
-    """批量DOCX转PDF服务 - 单文件单进程版本"""
+    """批量DOCX转PDF服务 - 最简单串行版本"""
 
     @staticmethod
     def scan_folder_structure(folder_path: str) -> Dict:
@@ -163,7 +163,7 @@ except Exception as e:
         progress_callback=None
     ) -> List[dict]:
         """
-        批量转换DOCX文件,保持文件夹结构（单文件单进程版本）
+        批量转换DOCX文件,保持文件夹结构（最简单串行版本）
 
         Args:
             structure: 文件夹结构
@@ -189,7 +189,7 @@ except Exception as e:
         top_output_dir = os.path.join(output_base_dir, top_folder_name)
         os.makedirs(top_output_dir, exist_ok=True)
 
-        # 逐个处理文件
+        # 逐个处理文件（串行，一个接一个）
         for index, file_info in enumerate(all_files, 1):
             try:
                 # 计算相对路径
@@ -225,8 +225,8 @@ except Exception as e:
                 if progress_callback:
                     progress_callback(index, total, result)
 
-                # 文件间延迟，避免进程冲突
-                time.sleep(1.5)
+                # 文件间延迟，确保进程完全退出
+                time.sleep(2)
 
             except Exception as e:
                 result = {
@@ -250,7 +250,7 @@ except Exception as e:
         progress_callback=None
     ) -> List[dict]:
         """
-        批量将DOCX文件转换为PDF（单文件单进程版本）
+        批量将DOCX文件转换为PDF（最简单串行版本）
 
         Args:
             input_files: 输入DOCX文件路径列表
@@ -269,7 +269,7 @@ except Exception as e:
         # 确保输出目录存在
         os.makedirs(output_dir, exist_ok=True)
 
-        # 逐个处理文件
+        # 逐个处理文件（串行）
         for index, input_file in enumerate(input_files, 1):
             try:
                 # 生成输出文件名
@@ -295,7 +295,7 @@ except Exception as e:
                     progress_callback(index, total, result)
 
                 # 文件间延迟
-                time.sleep(1.5)
+                time.sleep(2)
 
             except Exception as e:
                 result = {
