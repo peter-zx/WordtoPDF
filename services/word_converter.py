@@ -1,5 +1,5 @@
 """
-Word转PDF工具 - 单文件转换（修复版本）
+Word转PDF工具 - 支持DOC和DOCX格式
 """
 
 import os
@@ -11,9 +11,10 @@ from typing import Tuple
 def convert_single_file(input_path: str, output_path: str) -> Tuple[bool, str]:
     """
     转换单个文件 - 使用独立Word进程
+    支持DOC和DOCX格式
 
     Args:
-        input_path: 输入DOCX文件路径
+        input_path: 输入Word文件路径(DOC或DOCX)
         output_path: 输出PDF文件路径
 
     Returns:
@@ -32,13 +33,13 @@ try:
     word.Visible = False
     word.DisplayAlerts = False
 
-    # 打开文档（绝对路径）
+    # 打开文档（绝对路径）- 支持DOC和DOCX
     input_file = r"{input_path}"
     output_file = r"{output_path}"
 
     doc = word.Documents.Open(input_file, ReadOnly=True, Visible=False)
 
-    # 保存为PDF
+    # 保存为PDF (FileFormat=17 表示PDF格式)
     doc.SaveAs(output_file, FileFormat=17)
 
     # 关闭文档
@@ -79,7 +80,7 @@ except Exception as e:
             [sys.executable, script_path],
             capture_output=True,
             text=True,
-            timeout=30,
+            timeout=60,  # 增加超时时间到60秒
             creationflags=subprocess.CREATE_NO_WINDOW
         )
 
@@ -90,7 +91,6 @@ except Exception as e:
             pass
 
         # 最终判断：检查输出文件是否存在
-        # 即使subprocess返回错误，如果文件存在就认为成功
         if os.path.exists(output_path):
             # 检查文件大小，确保不是空文件
             if os.path.getsize(output_path) > 0:
@@ -128,3 +128,16 @@ except Exception as e:
         if os.path.exists(output_path) and os.path.getsize(output_path) > 0:
             return True, ""
         return False, str(e)
+
+
+def is_word_file(file_path: str) -> bool:
+    """
+    检查文件是否为Word文件
+
+    Args:
+        file_path: 文件路径
+
+    Returns:
+        是否为Word文件
+    """
+    return file_path.lower().endswith(('.doc', '.docx'))

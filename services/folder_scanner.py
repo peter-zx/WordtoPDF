@@ -1,14 +1,18 @@
 """
-文件夹扫描工具 - 专门处理文件夹结构
+文件夹扫描工具 - 支持DOC和DOCX格式
 """
 
 import os
 from typing import List, Dict
 
 
+# 支持的Word文件扩展名
+WORD_EXTENSIONS = ('.doc', '.docx')
+
+
 def scan_folder_structure(folder_path: str) -> Dict:
     """
-    扫描文件夹结构,识别所有DOCX文件
+    扫描文件夹结构,识别所有Word文件(DOC/DOCX)
 
     Args:
         folder_path: 文件夹路径
@@ -21,7 +25,7 @@ def scan_folder_structure(folder_path: str) -> Dict:
         "name": os.path.basename(folder_path),
         "type": "folder",
         "children": [],
-        "docx_files": []
+        "docx_files": []  # 实际包含doc和docx
     }
 
     try:
@@ -35,8 +39,8 @@ def scan_folder_structure(folder_path: str) -> Dict:
                 child_structure = scan_folder_structure(item_path)
                 structure["children"].append(child_structure)
 
-            elif item.lower().endswith('.docx'):
-                # 添加DOCX文件，记录相对路径
+            elif item.lower().endswith(WORD_EXTENSIONS):
+                # 添加Word文件（DOC或DOCX）
                 structure["docx_files"].append({
                     "name": item,
                     "path": item_path,
@@ -51,20 +55,20 @@ def scan_folder_structure(folder_path: str) -> Dict:
 
 def get_all_docx_files(structure: Dict) -> List[Dict]:
     """
-    从文件夹结构中获取所有DOCX文件
+    从文件夹结构中获取所有Word文件(DOC/DOCX)
 
     Args:
         structure: 文件夹结构字典
 
     Returns:
-        DOCX文件列表
+        Word文件列表
     """
     files = []
 
-    # 添加当前文件夹的DOCX文件
+    # 添加当前文件夹的Word文件
     files.extend(structure.get("docx_files", []))
 
-    # 递归添加子文件夹的DOCX文件
+    # 递归添加子文件夹的Word文件
     for child in structure.get("children", []):
         files.extend(get_all_docx_files(child))
 
@@ -82,7 +86,7 @@ def print_folder_structure(structure: Dict, level: int = 0):
     indent = "  " * level
     print(f"{indent}📁 {structure['name']}/")
 
-    # 打印当前文件夹的DOCX文件
+    # 打印当前文件夹的Word文件
     for docx in structure.get("docx_files", []):
         print(f"{indent}  📄 {docx['name']} - {docx['relative_path']}")
 
