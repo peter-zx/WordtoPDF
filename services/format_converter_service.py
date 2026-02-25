@@ -4,9 +4,7 @@
 """
 
 import os
-import shutil
-from typing import List, Dict, Any, Optional
-from pathlib import Path
+from typing import List, Dict, Any
 
 
 class FormatConverterService:
@@ -88,9 +86,20 @@ class FormatConverterService:
         try:
             from docx import Document
 
-            # 读取TXT文件
-            with open(input_path, 'r', encoding='utf-8') as f:
-                content = f.read()
+            # 尝试不同编码读取TXT文件
+            encodings = ['utf-8', 'gbk', 'gb2312', 'gb18030']
+            content = None
+
+            for encoding in encodings:
+                try:
+                    with open(input_path, 'r', encoding=encoding) as f:
+                        content = f.read()
+                    break
+                except UnicodeDecodeError:
+                    continue
+
+            if content is None:
+                raise Exception("无法识别文件编码")
 
             # 创建DOCX文档
             doc = Document()
@@ -107,9 +116,20 @@ class FormatConverterService:
             from docx import Document
             from bs4 import BeautifulSoup
 
-            # 读取HTML文件
-            with open(input_path, 'r', encoding='utf-8') as f:
-                html_content = f.read()
+            # 尝试不同编码读取HTML文件
+            encodings = ['utf-8', 'gbk', 'gb2312', 'gb18030']
+            html_content = None
+
+            for encoding in encodings:
+                try:
+                    with open(input_path, 'r', encoding=encoding) as f:
+                        html_content = f.read()
+                    break
+                except UnicodeDecodeError:
+                    continue
+
+            if html_content is None:
+                raise Exception("无法识别文件编码")
 
             # 解析HTML
             soup = BeautifulSoup(html_content, 'html.parser')
@@ -130,57 +150,69 @@ class FormatConverterService:
 
     @staticmethod
     def _convert_rtf_to_docx(input_path: str, output_path: str):
-        """RTF转DOCX"""
+        """RTF转DOCX - 使用Word或WPS打开并另存为DOCX"""
         try:
-            # 方法1: 使用pypandoc转换(推荐)
-            try:
-                import pypandoc
-                pypandoc.convert_file(input_path, 'docx', outputfile=output_path)
-                return
-            except Exception:
-                pass
+            import win32com.client
 
-            # 方法2: 使用pywin32转换(Windows)
-            try:
-                import win32com.client
-                word = win32com.client.Dispatch("Word.Application")
-                word.Visible = False
+            # 转换为绝对路径
+            input_path = os.path.abspath(input_path)
+            output_path = os.path.abspath(output_path)
 
-                # 打开RTF文件
-                doc = word.Documents.Open(input_path)
-                # 保存为DOCX
-                doc.SaveAs(output_path, FileFormat=16)  # 16 = wdFormatXMLDocument
+            # 尝试使用WPS（因为系统优先调用WPS）
+            try:
+                # WPS的COM对象名称
+                wps = win32com.client.Dispatch("Kwps.Application")
+                wps.Visible = False
+                wps.DisplayAlerts = False
+
+                # 打开RTF文件，指定编码参数
+                doc = wps.Documents.Open(
+                    input_path,
+                    ConfirmConversions=False,
+                    ReadOnly=False,
+                    AddToRecentFiles=False,
+                    Visible=False,
+                    Encoding=936  # 936 = GBK编码
+                )
+
+                # 另存为DOCX格式
+                doc.SaveAs(output_path, FileFormat=16)
+
+                # 关闭文档和WPS
                 doc.Close()
-                word.Quit()
+                wps.Quit()
                 return
-            except Exception:
-                pass
 
-            # 方法3: 使用striprtf提取文本
-            try:
-                from striprtf.striprtf import rtf_to_text
+            except Exception as wps_error:
+                # WPS失败，尝试Microsoft Word
+                try:
+                    word = win32com.client.Dispatch("Word.Application")
+                    word.Visible = False
+                    word.DisplayAlerts = False
 
-                # 读取RTF文件
-                with open(input_path, 'r', encoding='utf-8', errors='ignore') as f:
-                    rtf_content = f.read()
+                    # 打开RTF文件（Word会自动检测编码）
+                    doc = word.Documents.Open(
+                        input_path,
+                        ConfirmConversions=False,
+                        ReadOnly=False,
+                        AddToRecentFiles=False,
+                        Visible=False,
+                        Encoding=936  # 指定GBK编码
+                    )
 
-                # 提取文本
-                text = rtf_to_text(rtf_content)
+                    # 另存为DOCX格式
+                    doc.SaveAs(output_path, FileFormat=16)  # 16 = wdFormatXMLDocument (DOCX)
 
-                # 创建DOCX文档
-                from docx import Document
-                doc = Document()
-                doc.add_paragraph(text)
-                doc.save(output_path)
-                return
-            except Exception:
-                pass
+                    # 关闭文档和Word
+                    doc.Close()
+                    word.Quit()
+                    return
 
-            # 如果所有方法都失败,抛出异常
-            raise Exception("RTF转换失败: 请安装pypandoc或pywin32或striprtf")
+                except Exception as word_error:
+                    raise Exception(f"RTF转换失败: WPS错误-{str(wps_error)}, Word错误-{str(word_error)}")
 
         except Exception as e:
-            raise Exception(f"RTF转换失败: {str(e)}")
+            raise Exception(f"RTF转换失败: 请确保已安装Microsoft Word或WPS Office。错误信息: {str(e)}")
 
     @staticmethod
     def _convert_odt_to_docx(input_path: str, output_path: str):

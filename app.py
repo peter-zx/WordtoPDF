@@ -72,5 +72,6 @@ st.title("📁 文件夹批量生成工具")
 st.markdown("---")
 
 # 导入并渲染文件夹生成页面
-import pages.folder_generator as folder_generator
+import importlib
+folder_generator = importlib.import_module('pages.文件夹生成')
 folder_generator.render()
