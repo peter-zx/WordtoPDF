@@ -1,5 +1,5 @@
 """
-批量PDF转换页面 - 使用文件夹浏览器对话框
+批量PDF转换页面 - 简化版
 """
 
 import os
@@ -34,8 +34,8 @@ def render():
         st.session_state.input_folder_path = ''
     if 'output_folder_path' not in st.session_state:
         st.session_state.output_folder_path = ''
-    if 'folder_structure' not in st.session_state:
-        st.session_state.folder_structure = None
+    if 'docx_files' not in st.session_state:
+        st.session_state.docx_files = []
 
     # 步骤1: 选择输入文件夹
     st.markdown("## 📂 步骤1: 选择输入文件夹")
@@ -55,7 +55,7 @@ def render():
             selected = select_folder_dialog()
             if selected:
                 st.session_state.input_folder_path = selected
-                st.session_state.folder_structure = None
+                st.session_state.docx_files = []
                 st.rerun()
 
     # 显示当前路径状态
@@ -64,18 +64,6 @@ def render():
             st.success(f"✅ 已选择: `{st.session_state.input_folder_path}`")
         else:
             st.warning(f"⚠️ 路径不存在: `{st.session_state.input_folder_path}`")
-
-    st.markdown("---")
-
-    # 扫描按钮
-    if st.button("🔍 扫描文件夹结构", type="primary", use_container_width=True, disabled=not st.session_state.input_folder_path):
-        scan_folder(st.session_state.input_folder_path)
-
-    # 显示扫描结果
-    if st.session_state.folder_structure:
-        st.markdown("---")
-        st.markdown("### 📁 文件夹结构预览")
-        display_folder_structure(st.session_state.folder_structure)
 
     st.markdown("---")
 
@@ -112,82 +100,41 @@ def render():
     st.markdown("## 🚀 步骤3: 开始转换")
 
     can_convert = (
-        st.session_state.folder_structure is not None
+        st.session_state.input_folder_path
         and st.session_state.output_folder_path
     )
 
     if st.button("开始批量转换", disabled=not can_convert, type="primary", use_container_width=True):
         execute_conversion(
-            st.session_state.folder_structure,
+            st.session_state.input_folder_path,
             st.session_state.output_folder_path
         )
 
 
-def scan_folder(folder_path):
-    """扫描文件夹"""
-    if not folder_path:
-        st.error("❌ 请先选择输入文件夹")
-        return
-
-    if not os.path.exists(folder_path):
-        st.error(f"❌ 文件夹路径不存在: {folder_path}")
-        return
-
-    if not os.path.isdir(folder_path):
-        st.error(f"❌ 请输入文件夹路径,不是文件路径: {folder_path}")
-        return
-
-    with st.spinner("正在扫描文件夹结构..."):
+def execute_conversion(input_folder, output_folder):
+    """执行转换"""
+    # 先扫描文件夹
+    with st.spinner("正在扫描文件夹..."):
         try:
-            structure = BatchPDFService.scan_folder_structure(folder_path)
-            st.session_state.folder_structure = structure
-
-            # 统计文件数量
+            structure = BatchPDFService.scan_folder_structure(input_folder)
             all_files = BatchPDFService.get_all_docx_files(structure)
 
-            if len(all_files) > 0:
-                st.success(f"✅ 扫描完成! 共找到 {len(all_files)} 个DOCX文件")
-            else:
-                st.warning("⚠️ 未找到DOCX文件,请确认文件夹中包含.docx文件")
+            if len(all_files) == 0:
+                st.warning("⚠️ 未找到DOCX文件")
+                return
+
+            st.success(f"✅ 找到 {len(all_files)} 个DOCX文件")
         except Exception as e:
             st.error(f"❌ 扫描失败: {str(e)}")
+            return
 
-
-def display_folder_structure(structure, level=0, max_level=3):
-    """显示文件夹结构"""
-    indent = "  " * level
-
-    # 显示当前文件夹
-    folder_name = structure["name"]
-    docx_count = len(structure["docx_files"])
-    child_count = len(structure["children"])
-
-    if docx_count > 0:
-        st.markdown(f"{indent}📁 **{folder_name}** ({docx_count} 个DOCX文件)")
-    else:
-        st.markdown(f"{indent}📁 {folder_name}")
-
-    # 显示DOCX文件
-    for file_info in structure["docx_files"]:
-        st.markdown(f"{indent}  📄 `{file_info['name']}`")
-
-    # 递归显示子文件夹
-    if level < max_level:
-        for child in structure["children"]:
-            display_folder_structure(child, level + 1, max_level)
-    elif child_count > 0:
-        st.markdown(f"{indent}  ... (还有 {child_count} 个子文件夹)")
-
-
-def execute_conversion(structure, output_dir):
-    """执行转换"""
     # 创建进度条
     progress_bar = st.progress(0)
     status_text = st.empty()
 
     try:
         # 执行批量转换
-        status_text.text("正在初始化转换...")
+        status_text.text("正在转换文件...")
 
         def update_progress(current, total, result):
             progress = current / total
@@ -198,7 +145,7 @@ def execute_conversion(structure, output_dir):
         # 执行转换
         results = BatchPDFService.batch_convert_with_structure(
             structure,
-            output_dir,
+            output_folder,
             progress_callback=update_progress
         )
 
@@ -206,7 +153,7 @@ def execute_conversion(structure, output_dir):
         progress_bar.progress(1.0)
         status_text.text("转换完成!")
 
-        display_results(results, output_dir)
+        display_results(results, output_folder)
 
     except Exception as e:
         st.error(f"❌ 转换过程中发生错误: {str(e)}")
