@@ -24,6 +24,15 @@ def select_folder_dialog():
     return folder_path
 
 
+def get_desktop_path():
+    """获取桌面路径"""
+    desktop = os.path.join(os.path.expanduser("~"), "Desktop")
+    if os.path.exists(desktop):
+        return desktop
+    else:
+        return os.path.expanduser("~")
+
+
 def render():
     """渲染批量PDF转换页面"""
     st.title("📑 批量PDF转换")
@@ -33,7 +42,9 @@ def render():
     if 'input_folder_path' not in st.session_state:
         st.session_state.input_folder_path = ''
     if 'output_folder_path' not in st.session_state:
-        st.session_state.output_folder_path = ''
+        # 默认导出到桌面的PDF_Output文件夹
+        desktop = get_desktop_path()
+        st.session_state.output_folder_path = os.path.join(desktop, "PDF_Output")
     if 'docx_files' not in st.session_state:
         st.session_state.docx_files = []
 
@@ -76,7 +87,7 @@ def render():
         output_path = st.text_input(
             "输出文件夹路径",
             value=st.session_state.output_folder_path,
-            placeholder="点击右侧按钮选择文件夹...",
+            placeholder="默认导出到桌面/PDF_Output",
             key="output_path_text"
         )
 
@@ -92,7 +103,7 @@ def render():
         if os.path.exists(st.session_state.output_folder_path):
             st.success(f"✅ 已选择: `{st.session_state.output_folder_path}`")
         else:
-            st.warning(f"⚠️ 路径不存在，将自动创建: `{st.session_state.output_folder_path}`")
+            st.info(f"📁 将自动创建: `{st.session_state.output_folder_path}`")
 
     st.markdown("---")
 
@@ -153,13 +164,13 @@ def execute_conversion(input_folder, output_folder):
         progress_bar.progress(1.0)
         status_text.text("转换完成!")
 
-        display_results(results, output_folder)
+        display_results(results, output_folder, input_folder)
 
     except Exception as e:
         st.error(f"❌ 转换过程中发生错误: {str(e)}")
 
 
-def display_results(results, output_dir):
+def display_results(results, output_dir, input_folder):
     """显示转换结果"""
     # 获取摘要
     summary = BatchPDFService.get_conversion_summary(results)
@@ -203,9 +214,10 @@ def display_results(results, output_dir):
                     else:
                         st.success(f"`{input_file}` → `{output_file}`")
 
-    # 显示输出目录
+    # 显示输出目录和文件夹结构说明
     st.markdown("---")
     st.info(f"📂 输出目录: `{output_dir}`")
+    st.markdown(f"📁 文件夹结构: PDF文件已按原始文件夹结构保存，顶层文件夹名为 `{os.path.basename(input_folder)}`")
 
     # 打开输出目录按钮
     col1, col2, col3 = st.columns(3)

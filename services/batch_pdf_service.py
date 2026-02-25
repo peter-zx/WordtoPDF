@@ -141,12 +141,19 @@ class BatchPDFService:
         results = []
         word_app = None
 
+        # 获取顶层文件夹名称
+        top_folder_name = structure["name"]
+
         try:
             # 创建Word应用实例（只创建一次）
             import win32com.client
             word_app = win32com.client.Dispatch("Word.Application")
             word_app.Visible = False
             word_app.DisplayAlerts = False
+
+            # 创建顶层文件夹
+            top_output_dir = os.path.join(output_base_dir, top_folder_name)
+            os.makedirs(top_output_dir, exist_ok=True)
 
             # 分批处理
             for batch_start in range(0, total, batch_size):
@@ -161,9 +168,9 @@ class BatchPDFService:
                         # 计算相对路径
                         relative_path = file_info["relative_path"]
 
-                        # 保持文件夹结构
+                        # 保持文件夹结构，添加顶层文件夹
                         relative_dir = os.path.dirname(relative_path)
-                        output_dir = os.path.join(output_base_dir, relative_dir)
+                        output_dir = os.path.join(top_output_dir, relative_dir)
 
                         # 确保输出目录存在
                         os.makedirs(output_dir, exist_ok=True)
