@@ -1,5 +1,5 @@
 """
-批量PDF转换页面 - Word本地版本
+批量PDF转换页面 - 带文件夹树选择
 """
 
 import os
@@ -7,6 +7,7 @@ import streamlit as st
 import tkinter as tk
 from tkinter import filedialog
 from services.batch_pdf_service import BatchPDFService
+from components.folder_tree import FolderTreeComponent
 
 
 def select_folder_dialog():
@@ -47,8 +48,10 @@ def render():
         # 默认导出到桌面的PDF_Output文件夹
         desktop = get_desktop_path()
         st.session_state.output_folder_path = os.path.join(desktop, "PDF_Output")
-    if 'docx_files' not in st.session_state:
-        st.session_state.docx_files = []
+    if 'folder_structure' not in st.session_state:
+        st.session_state.folder_structure = None
+    if 'selected_files' not in st.session_state:
+        st.session_state.selected_files = set()
 
     # 步骤1: 选择输入文件夹
     st.markdown("## 📂 步骤1: 选择输入文件夹")
@@ -68,7 +71,8 @@ def render():
             selected = select_folder_dialog()
             if selected:
                 st.session_state.input_folder_path = selected
-                st.session_state.docx_files = []
+                st.session_state.selected_files = set()  # 清空选择
+                st.session_state.folder_structure = None  # 清空结构
                 st.rerun()
 
     # 显示当前路径状态
@@ -77,6 +81,46 @@ def render():
             st.success(f"✅ 已选择: `{st.session_state.input_folder_path}`")
         else:
             st.warning(f"⚠️ 路径不存在: `{st.session_state.input_folder_path}`")
+
+    # 扫描并显示文件夹结构树
+    if st.session_state.input_folder_path and os.path.exists(st.session_state.input_folder_path):
+        st.markdown("---")
+        st.markdown("### 📁 文件夹结构（选择要转换的文件）")
+
+        # 扫描文件夹
+        if st.session_state.folder_structure is None:
+            with st.spinner("正在扫描文件夹..."):
+                try:
+                    structure = BatchPDFService.scan_folder_structure(
+                        st.session_state.input_folder_path
+                    )
+                    all_files = BatchPDFService.get_all_docx_files(structure)
+
+                    if len(all_files) == 0:
+                        st.warning("⚠️ 未找到DOCX文件")
+                        return
+
+                    st.session_state.folder_structure = structure
+                except Exception as e:
+                    st.error(f"❌ 扫描失败: {str(e)}")
+                    return
+
+        # 显示文件夹树
+        if st.session_state.folder_structure:
+            # 全选/反选/清空控制
+            FolderTreeComponent.render_selection_controls(
+                st.session_state.folder_structure,
+                st.session_state.selected_files
+            )
+
+            st.markdown("---")
+
+            # 文件夹树
+            with st.expander("查看文件夹结构", expanded=True):
+                st.session_state.selected_files = FolderTreeComponent.render_folder_tree(
+                    st.session_state.folder_structure,
+                    st.session_state.selected_files
+                )
 
     st.markdown("---")
 
@@ -115,37 +159,35 @@ def render():
     can_convert = (
         st.session_state.input_folder_path
         and st.session_state.output_folder_path
+        and len(st.session_state.selected_files) > 0
     )
 
     if st.button("开始批量转换", disabled=not can_convert, type="primary", use_container_width=True):
         execute_conversion(
             st.session_state.input_folder_path,
-            st.session_state.output_folder_path
+            st.session_state.output_folder_path,
+            st.session_state.selected_files
         )
 
 
-def execute_conversion(input_folder, output_folder):
+def execute_conversion(input_folder, output_folder, selected_files):
     """执行转换"""
-    # 先扫描文件夹
-    with st.spinner("正在扫描文件夹..."):
-        try:
-            structure = BatchPDFService.scan_folder_structure(input_folder)
-            all_files = BatchPDFService.get_all_docx_files(structure)
-
-            if len(all_files) == 0:
-                st.warning("⚠️ 未找到DOCX文件")
-                return
-
-            st.success(f"✅ 找到 {len(all_files)} 个DOCX文件")
-        except Exception as e:
-            st.error(f"❌ 扫描失败: {str(e)}")
-            return
-
     # 创建进度条
     progress_bar = st.progress(0)
     status_text = st.empty()
 
     try:
+        # 构建文件信息列表
+        file_list = []
+        for file_path in selected_files:
+            file_list.append({
+                "name": os.path.basename(file_path),
+                "path": file_path,
+                "relative_path": os.path.relpath(file_path, input_folder)
+            })
+
+        total = len(file_list)
+
         # 执行批量转换
         status_text.text("正在转换文件...")
 
@@ -154,6 +196,15 @@ def execute_conversion(input_folder, output_folder):
             progress_bar.progress(progress)
             filename = os.path.basename(result['input_file'])
             status_text.text(f"正在转换: {current}/{total} ({progress*100:.1f}%) - {filename}")
+
+        # 构建结构（用于保持文件夹结构）
+        structure = {
+            "name": os.path.basename(input_folder),
+            "path": input_folder,
+            "type": "folder",
+            "children": [],
+            "docx_files": file_list
+        }
 
         # 执行转换（串行，一个接一个）
         results = BatchPDFService.batch_convert_with_structure(
