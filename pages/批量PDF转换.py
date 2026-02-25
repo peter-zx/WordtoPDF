@@ -155,12 +155,11 @@ def execute_conversion(input_folder, output_folder):
             filename = os.path.basename(result['input_file'])
             status_text.text(f"正在转换: {current}/{total} ({progress*100:.1f}%) - {filename}")
 
-        # 执行转换（使用Word，每批5个文件）
+        # 执行转换（串行，一个接一个）
         results = BatchPDFService.batch_convert_with_structure(
             structure,
             output_folder,
-            progress_callback=update_progress,
-            batch_size=5  # 每批5个文件，确保稳定性
+            progress_callback=update_progress
         )
 
         # 显示结果
