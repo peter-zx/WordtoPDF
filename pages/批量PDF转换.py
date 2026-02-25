@@ -1,12 +1,11 @@
 """
-批量PDF转换页面 - LibreOffice稳定版本
+批量PDF转换页面 - Word本地版本
 """
 
 import os
 import streamlit as st
 import tkinter as tk
 from tkinter import filedialog
-import subprocess
 from services.batch_pdf_service import BatchPDFService
 
 
@@ -34,48 +33,12 @@ def get_desktop_path():
         return os.path.expanduser("~")
 
 
-def check_libreoffice():
-    """检查LibreOffice是否安装"""
-    try:
-        # 尝试运行soffice --version
-        result = subprocess.run(
-            ['soffice', '--version'],
-            capture_output=True,
-            text=True,
-            timeout=5,
-            creationflags=subprocess.CREATE_NO_WINDOW if os.name == 'nt' else 0
-        )
-        return result.returncode == 0
-    except:
-        return False
-
-
 def render():
     """渲染批量PDF转换页面"""
     st.title("📑 批量PDF转换")
     st.markdown("---")
 
-    # 检查LibreOffice
-    libreoffice_installed = check_libreoffice()
-
-    if not libreoffice_installed:
-        st.error("❌ 未检测到LibreOffice")
-        st.markdown("""
-        ### 请先安装LibreOffice
-
-        **为什么需要LibreOffice？**
-        - LibreOffice比Word COM接口更稳定
-        - 支持批量处理，成功率接近100%
-        - 免费开源，无需购买
-
-        **安装方式：**
-        1. 访问 https://www.libreoffice.org/download/download/
-        2. 下载并安装LibreOffice
-        3. 安装完成后刷新页面
-        """)
-        return
-
-    st.success("✅ LibreOffice已安装，可以开始转换")
+    st.info("💡 使用Microsoft Word进行转换，确保已安装Word")
 
     # 初始化session state
     if 'input_folder_path' not in st.session_state:
@@ -192,13 +155,12 @@ def execute_conversion(input_folder, output_folder):
             filename = os.path.basename(result['input_file'])
             status_text.text(f"正在转换: {current}/{total} ({progress*100:.1f}%) - {filename}")
 
-        # 执行转换（使用LibreOffice，稳定可靠）
+        # 执行转换（使用Word，每批5个文件）
         results = BatchPDFService.batch_convert_with_structure(
             structure,
             output_folder,
             progress_callback=update_progress,
-            batch_size=10,
-            max_workers=2
+            batch_size=5  # 每批5个文件，确保稳定性
         )
 
         # 显示结果
