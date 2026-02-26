@@ -59,7 +59,31 @@ class FolderTreeComponent:
         selected_dict = FolderTreeComponent._load_selected()
         selected_count = sum(1 for p in all_paths if selected_dict.get(p, False))
 
-        col1, col2, col3, col4 = st.columns([1, 1, 1, 2])
+        # 注入样式
+        st.markdown("""
+        <style>
+            .selected-count-box {
+                background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+                border-radius: 12px;
+                padding: 16px 24px;
+                text-align: center;
+                color: white;
+                box-shadow: 0 4px 15px rgba(102, 126, 234, 0.4);
+            }
+            .selected-count-label {
+                font-size: 14px;
+                opacity: 0.9;
+                margin-bottom: 4px;
+            }
+            .selected-count-number {
+                font-size: 32px;
+                font-weight: 700;
+                letter-spacing: 2px;
+            }
+        </style>
+        """, unsafe_allow_html=True)
+
+        col1, col2, col3, col4 = st.columns([1, 1, 1, 1.5])
 
         with col1:
             if st.button("全选", key="btn_all", use_container_width=True):
@@ -86,7 +110,12 @@ class FolderTreeComponent:
                 st.rerun()
 
         with col4:
-            st.metric("已选择文件", f"{selected_count}/{total}")
+            st.markdown(f"""
+            <div class="selected-count-box">
+                <div class="selected-count-label">已选择文件</div>
+                <div class="selected-count-number">{selected_count} / {total}</div>
+            </div>
+            """, unsafe_allow_html=True)
 
     @staticmethod
     def render_folder_tree(structure: Dict) -> None:
