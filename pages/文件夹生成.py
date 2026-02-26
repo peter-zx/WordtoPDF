@@ -1,17 +1,20 @@
 """
-文件夹生成页面
+文件夹生成页面 - 支持下载到本地
 """
 
 import streamlit as st
 import os
 import sys
+import zipfile
+import tempfile
+import shutil
+from datetime import datetime
 
 # 添加父目录到路径
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
 import services.folder_service as folder_service
 import services.file_service as file_service
-import components.folder_selector as folder_selector
 
 
 def render():
@@ -80,7 +83,8 @@ def render():
 
     uploaded_files = st.file_uploader(
         "选择文件",
-        accept_multiple_files=True
+        accept_multiple_files=True,
+        key="template_files_uploader"
     )
 
     if uploaded_files:
@@ -108,16 +112,7 @@ def render():
     # ==================== 步骤3: 开始生成 ====================
     st.markdown("## 步骤3: 开始生成")
 
-    # 交互体1: 选择导出路径
-    st.markdown("### 🎯 选择导出路径")
-
-    # 默认桌面路径
-    desktop_path = os.path.join(os.path.expanduser("~"), "Desktop")
-
-    target_dir = folder_selector.render_folder_selector(
-        "路径",
-        desktop_path
-    )
+    st.info("💡 文件将生成到服务器临时目录，然后打包下载到您的电脑")
 
     use_timestamp = st.checkbox(
         "创建带时间戳的顶层文件夹",
@@ -132,8 +127,7 @@ def render():
 
     can_execute = (
         st.session_state.get('folder_names', []) and
-        st.session_state.get('template_files', []) and
-        target_dir
+        st.session_state.get('template_files', [])
     )
 
     if not can_execute:
@@ -141,11 +135,9 @@ def render():
             st.warning("⚠️ 请先输入文件夹名称")
         if not st.session_state.get('template_files', []):
             st.warning("⚠️ 请先选择复制文件")
-        if not target_dir:
-            st.warning("⚠️ 请指定导出路径")
 
     if st.button("🚀 开始生成", disabled=not can_execute, type="primary", use_container_width=True):
-        execute_generation(target_dir, use_timestamp)
+        execute_generation_and_download(use_timestamp)
 
     # 显示结果
     if st.session_state.get('generation_result'):
@@ -160,22 +152,68 @@ def render():
             st.write(f"**失败:** {len(result['failed'])} 个")
 
 
-def execute_generation(target_dir: str, use_timestamp: bool):
-    """执行文件夹生成"""
-    with st.spinner("正在生成文件夹..."):
-        result = folder_service.FolderService.create_folders_with_files(
-            folder_names=st.session_state.folder_names,
-            target_dir=target_dir,
-            template_files=st.session_state.template_files,
-            use_timestamp=use_timestamp
-        )
+def execute_generation_and_download(use_timestamp: bool):
+    """执行文件夹生成并打包下载"""
+    
+    # 创建临时输出目录
+    temp_output = tempfile.mkdtemp(prefix="folder_gen_")
+    
+    try:
+        with st.spinner("正在生成文件夹..."):
+            result = folder_service.FolderService.create_folders_with_files(
+                folder_names=st.session_state.folder_names,
+                target_dir=temp_output,
+                template_files=st.session_state.template_files,
+                use_timestamp=use_timestamp
+            )
 
-        st.session_state.generation_result = result
+            st.session_state.generation_result = result
 
-    file_service.FileService.cleanup_temp_directory(os.path.join(os.getcwd(), "temp_input"))
-    file_service.FileService.cleanup_temp_directory(os.path.join(os.getcwd(), "temp_templates"))
+        # 打包成ZIP
+        if result.get('success'):
+            with st.spinner("正在打包文件..."):
+                # 创建ZIP文件
+                zip_path = os.path.join(tempfile.gettempdir(), f"folders_{datetime.now().strftime('%Y%m%d_%H%M%S')}.zip")
+                
+                with zipfile.ZipFile(zip_path, 'w', zipfile.ZIP_DEFLATED) as zipf:
+                    for root, dirs, files in os.walk(temp_output):
+                        for file in files:
+                            file_path = os.path.join(root, file)
+                            arcname = os.path.relpath(file_path, temp_output)
+                            zipf.write(file_path, arcname)
+                
+                # 提供下载
+                with open(zip_path, 'rb') as f:
+                    zip_data = f.read()
+                
+                st.success("✅ 文件夹生成完成！")
+                st.download_button(
+                    label="📥 下载生成的文件夹 (ZIP)",
+                    data=zip_data,
+                    file_name=f"folders_{datetime.now().strftime('%Y%m%d_%H%M%S')}.zip",
+                    mime="application/zip",
+                    type="primary",
+                    use_container_width=True
+                )
+                
+                # 清理ZIP文件
+                try:
+                    os.remove(zip_path)
+                except:
+                    pass
 
-    st.rerun()
+        # 清理临时目录
+        file_service.FileService.cleanup_temp_directory(os.path.join(os.getcwd(), "temp_input"))
+        file_service.FileService.cleanup_temp_directory(os.path.join(os.getcwd(), "temp_templates"))
+        
+    except Exception as e:
+        st.error(f"❌ 生成失败: {str(e)}")
+    finally:
+        # 清理临时输出目录
+        try:
+            shutil.rmtree(temp_output, ignore_errors=True)
+        except:
+            pass
 
 
 # Streamlit页面入口
