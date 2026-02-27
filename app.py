@@ -16,15 +16,23 @@ if 'template_files' not in st.session_state:
 if 'generation_result' not in st.session_state:
     st.session_state.generation_result = None
 
-# 自定义CSS隐藏默认导航,使用中文导航
+# 自定义 CSS 隐藏默认导航，使用中文导航
 st.markdown("""
 <style>
-    /* 隐藏默认的侧边栏导航 */
+    /* 隐藏所有默认的侧边栏导航 */
     [data-testid="stSidebarNav"] {
-        display: none;
+        display: none !important;
+        visibility: hidden !important;
+        height: 0 !important;
+        overflow: hidden !important;
     }
-
-    /* 自定义导航样式 */
+    
+    /* 隐藏 pages 目录自动生成的导航链接 */
+    .stApp > div[data-testid="stSidebar"] > div:nth-child(1) {
+        display: none !important;
+    }
+    
+    /* 确保只保留自定义导航 */
     .custom-nav {
         padding: 1rem 0;
     }
@@ -64,10 +72,6 @@ with st.sidebar:
     # 工具箱
     if st.button("🛠️ 工具箱", use_container_width=True):
         st.switch_page("pages/工具箱.py")
-    
-    # 批量 PDF 转换 (快捷入口)
-    if st.button("📄 批量 PDF 转换", use_container_width=True):
-        st.switch_page("apps/批量 PDF 转换.py")
 
     st.markdown('</div>', unsafe_allow_html=True)
 
