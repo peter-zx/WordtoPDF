@@ -1,66 +1,109 @@
-# WordtoPDF 应用打包说明
+# WordtoPDF Application Build Guide
 
-## 打包步骤
+## Build Steps
 
-### 1. 准备环境
-确保已安装Python 3.8或更高版本
+### 1. Prepare Environment
+- Install Python 3.8 or higher
+- Install Microsoft Word (required for PDF conversion)
 
-### 2. 安装依赖
+### 2. Install Dependencies
 ```bash
 pip install -r requirements.txt
 pip install pyinstaller
 ```
 
-### 3. 执行打包
-双击运行 `build.bat` 脚本，或在命令行执行：
+### 3. Build Application
+Double-click `build.bat` or run:
 ```bash
 build.bat
 ```
 
-### 4. 获取安装包
-打包完成后，可执行文件位于：
+### 4. Get Distribution
+After building, you'll find:
 ```
-dist/WordtoPDF.exe
+dist/WordtoPDF/          - Application folder
+dist/WordtoPDF.zip       - Compressed package (recommended for distribution)
 ```
 
-## 用户使用说明
+## User Instructions
 
-### 发送给用户
-将 `dist/WordtoPDF.exe` 文件发送给其他用户即可
+### Send to Users
+Send the `dist/WordtoPDF.zip` file to users
 
-### 运行应用
-1. 双击 `WordtoPDF.exe` 启动应用
-2. 浏览器会自动打开 http://127.0.0.1:8501
-3. 开始使用应用
+### Installation
+1. Extract `WordtoPDF.zip`
+2. Open the extracted `WordtoPDF` folder
+3. Double-click `WordtoPDF.exe` to launch
 
-### 系统要求
-- Windows 10/11 64位
-- 需要安装 Microsoft Word (用于Word转PDF功能)
+### Usage
+1. Application will start automatically
+2. Browser opens at http://127.0.0.1:8501
+3. Start using the application
 
-## 注意事项
+## System Requirements
 
-1. **首次启动可能较慢**：因为需要解压内置的Python环境
-2. **杀毒软件可能误报**：首次运行可能需要添加信任
-3. **防火墙提示**：允许应用访问本地网络
-4. **Word要求**：批量PDF转换功能需要安装Microsoft Word
+- Windows 10/11 64-bit
+- Microsoft Word (for PDF conversion feature)
+- 4GB RAM or higher (8GB recommended)
+- 500MB free disk space
 
-## 打包选项
+## Technical Details
 
-如需自定义打包，可编辑 `build.bat` 文件中的参数：
+### Build Mode
+- **Mode**: Directory mode (onedir)
+- **Reason**: Reduces memory usage during execution
+- **Entry Point**: launcher.py
 
-- `--onefile`: 打包成单个exe文件
-- `--windowed`: 不显示控制台窗口
-- `--icon`: 设置应用图标
-- `--add-data`: 添加额外的文件/文件夹
+### Package Contents
+```
+WordtoPDF/
+├── WordtoPDF.exe      (20MB - main executable)
+├── _internal/         (Python runtime and dependencies)
+└── pages/             (Application pages)
+```
 
-## 故障排查
+### Distribution Format
+- **Folder**: dist/WordtoPDF/ (uncompressed)
+- **ZIP**: dist/WordtoPDF.zip (120MB compressed)
 
-### 打包失败
-- 检查Python版本是否 >= 3.8
-- 确保所有依赖已正确安装
-- 查看错误日志
+## Troubleshooting
 
-### 运行报错
-- 检查是否安装了Microsoft Word
-- 查看临时文件夹权限
-- 检查杀毒软件是否拦截
+### Build Issues
+- Ensure Python version >= 3.8
+- Check all dependencies are installed
+- Verify Windows version (10/11 64-bit only)
+
+### Runtime Issues
+- Check Microsoft Word is installed
+- Verify sufficient RAM (4GB minimum)
+- Check antivirus software (may block execution)
+- Verify Windows Defender settings
+
+### Performance Tips
+- Close other applications before running
+- Use SSD for better performance
+- Increase virtual memory if needed
+
+## Advanced Options
+
+### Custom Build
+Edit `build.bat` to modify:
+- `--onedir`: Use directory mode
+- `--windowed`: Hide console window
+- `--add-data`: Add additional files
+- `--hidden-import`: Include extra modules
+
+### Single File Mode
+To build as single exe (larger, more memory):
+```bash
+pyinstaller --name "WordtoPDF" --onefile ...
+```
+**Warning**: May cause memory issues on systems with limited RAM
+
+## Version History
+
+### v1.0 (2026-02-27)
+- Initial release
+- Directory mode packaging
+- Reduced memory usage
+- 20MB executable size

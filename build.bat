@@ -23,7 +23,7 @@ if exist "dist" rmdir /s /q "dist"
 
 echo [4/4] Building application...
 pyinstaller --name "WordtoPDF" ^
-    --onefile ^
+    --onedir ^
     --windowed ^
     --add-data "pages;pages" ^
     --add-data "components;components" ^
@@ -47,9 +47,9 @@ if %errorlevel% equ 0 (
     echo   Build Complete!
     echo ========================================
     echo.
-    echo Executable: dist\WordtoPDF.exe
+    echo Application folder: dist\WordtoPDF\
     echo.
-    echo You can send dist\WordtoPDF.exe to other users.
+    echo You can send the entire dist\WordtoPDF folder to other users.
     echo.
 ) else (
     echo.
