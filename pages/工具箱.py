@@ -40,7 +40,7 @@ st.markdown("""
 
 # 工具列表
 tools = [
-    {"name": "批量PDF转换", "page": "pages/批量PDF转换.py", "enabled": True},
+    {"name": "批量 PDF 转换", "page": "apps/批量 PDF 转换.py", "enabled": True},
     {"name": "文档格式转换", "page": "pages/文档格式转换.py", "enabled": True},
     {"name": "文件重命名", "page": None, "enabled": False},
     {"name": "图片处理", "page": None, "enabled": False},

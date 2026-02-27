@@ -64,6 +64,10 @@ with st.sidebar:
     # 工具箱
     if st.button("🛠️ 工具箱", use_container_width=True):
         st.switch_page("pages/工具箱.py")
+    
+    # 批量 PDF 转换 (快捷入口)
+    if st.button("📄 批量 PDF 转换", use_container_width=True):
+        st.switch_page("apps/批量 PDF 转换.py")
 
     st.markdown('</div>', unsafe_allow_html=True)
 
