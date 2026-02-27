@@ -21,6 +21,8 @@ def render():
     # 初始化session state
     if 'uploaded_files' not in st.session_state:
         st.session_state.uploaded_files = []
+    if 'file_selection' not in st.session_state:
+        st.session_state.file_selection = {}
     if 'converted_files' not in st.session_state:
         st.session_state.converted_files = []
     if 'show_results' not in st.session_state:
@@ -81,14 +83,17 @@ def render():
                 for root, dirs, files in os.walk(extract_dir):
                     for file in files:
                         if file.lower().endswith(('.doc', '.docx')):
+                            file_path = os.path.join(root, file)
                             word_files.append({
                                 'name': file,
-                                'path': os.path.join(root, file),
-                                'relative': os.path.relpath(os.path.join(root, file), extract_dir)
+                                'path': file_path,
+                                'relative': os.path.relpath(file_path, extract_dir)
                             })
                 
+                # 初始化选择状态
                 st.session_state.uploaded_files = word_files
                 st.session_state.temp_dir = temp_dir
+                st.session_state.file_selection = {f['path']: False for f in word_files}
                 
                 if word_files:
                     st.success(f"✅ 找到 {len(word_files)} 个Word文件")
@@ -108,19 +113,21 @@ def render():
         
         with col1:
             if st.button("全选", key="btn_all"):
-                st.session_state.selected_files = st.session_state.uploaded_files
+                for f in st.session_state.uploaded_files:
+                    st.session_state.file_selection[f['path']] = True
                 st.rerun()
         
         with col2:
             if st.button("清空", key="btn_clear"):
-                st.session_state.selected_files = []
+                for f in st.session_state.uploaded_files:
+                    st.session_state.file_selection[f['path']] = False
                 st.rerun()
         
         with col3:
             st.write("")
         
         # 显示已选择计数
-        selected_count = len(st.session_state.get('selected_files', []))
+        selected_count = sum(1 for selected in st.session_state.file_selection.values() if selected)
         total_count = len(st.session_state.uploaded_files)
         
         with col4:
@@ -135,26 +142,23 @@ def render():
         st.markdown("---")
         st.markdown("### 📋 选择要转换的文件")
         
-        selected_files = st.session_state.get('selected_files', [])
-        
         for i, file_info in enumerate(st.session_state.uploaded_files):
-            is_selected = file_info in selected_files
+            file_path = file_info['path']
+            is_selected = st.session_state.file_selection.get(file_path, False)
             
-            # 使用多选框
-            if st.checkbox(f"📄 {file_info['name']}", value=is_selected, key=f"file_{i}"):
-                if file_info not in selected_files:
-                    selected_files.append(file_info)
-            else:
-                if file_info in selected_files:
-                    selected_files.remove(file_info)
-        
-        st.session_state.selected_files = selected_files
+            # 使用checkbox更新状态
+            new_value = st.checkbox(f"📄 {file_info['name']}", value=is_selected, key=f"file_{i}")
+            
+            # 只有状态改变时才更新
+            if new_value != is_selected:
+                st.session_state.file_selection[file_path] = new_value
 
     # 步骤2: 开始转换
     st.markdown("---")
     st.markdown("## 🚀 步骤2: 开始转换")
     
-    selected_count = len(st.session_state.get('selected_files', []))
+    selected_files = get_selected_files()
+    selected_count = len(selected_files)
     can_convert = selected_count > 0
     
     if st.button("开始批量转换", disabled=not can_convert, type="primary", use_container_width=True):
@@ -225,9 +229,15 @@ def render():
                     st.success(f"`{f['original_name']}` → `{f['name']}`")
 
 
+def get_selected_files():
+    """获取选中的文件列表"""
+    return [f for f in st.session_state.uploaded_files 
+            if st.session_state.file_selection.get(f['path'], False)]
+
+
 def execute_conversion():
     """执行转换"""
-    selected_files = st.session_state.get('selected_files', [])
+    selected_files = get_selected_files()
     
     if not selected_files:
         st.warning("请先选择要转换的文件")
