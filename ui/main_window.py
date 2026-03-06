@@ -15,8 +15,22 @@ class MainWindow:
     def __init__(self, root):
         self.root = root
         self.root.title("文档整理工具 v1.0")
-        self.root.geometry("1100x850")
+        
+        # 设置窗口大小和最小尺寸，确保三栏布局不被遮盖
+        screen_width = self.root.winfo_screenwidth()
+        screen_height = self.root.winfo_screenheight()
+        
+        # 自适应窗口大小，但确保最小尺寸
+        window_width = min(1200, screen_width - 100)
+        window_height = min(900, screen_height - 100)
+        
+        self.root.geometry(f"{window_width}x{window_height}")
+        self.root.minsize(1000, 700)  # 设置最小尺寸避免布局被破坏
         self.root.resizable(True, True)
+        
+        # 配置根窗口的网格权重，确保子组件可以扩展
+        self.root.columnconfigure(0, weight=1)
+        self.root.rowconfigure(0, weight=1)
 
         # 核心组件引用（由外部注入）
         self.excel_parser = None
@@ -63,9 +77,14 @@ class MainWindow:
         title_frame.pack(fill=tk.X, padx=20, pady=10)
         tk.Label(title_frame, text="文档整理工具", font=("微软雅黑", 20, "bold")).pack()
 
-        # 主框架
+        # 主框架 - 三栏网格布局
         main_frame = ttk.Frame(self.root)
         main_frame.pack(fill=tk.BOTH, expand=True, padx=20, pady=5)
+        
+        # 配置三列等宽布局
+        main_frame.columnconfigure(0, weight=1, uniform="main_col")
+        main_frame.columnconfigure(1, weight=1, uniform="main_col")
+        main_frame.columnconfigure(2, weight=1, uniform="main_col")
 
         # 左侧
         self._setup_left_panel(main_frame)
@@ -83,7 +102,11 @@ class MainWindow:
     def _setup_left_panel(self, parent):
         """左侧面板"""
         left_frame = ttk.LabelFrame(parent, text="第1步: 选择Excel和源文件夹", padding=15)
-        left_frame.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=(0, 10))
+        left_frame.grid(row=0, column=0, sticky="nsew", padx=(0, 10))
+        left_frame.columnconfigure(0, weight=1)
+        
+        # 设置最小宽度避免内容被遮盖
+        left_frame.configure(width=300)
 
         # Excel
         tk.Label(left_frame, text="1. 选择Excel表格:", font=("微软雅黑", 11, "bold")).pack(anchor=tk.W, pady=(0, 5))
@@ -125,7 +148,11 @@ class MainWindow:
     def _setup_mid_panel(self, parent):
         """中间面板 - 文件夹树"""
         mid_frame = ttk.LabelFrame(parent, text="第2步: 选择目标文件夹", padding=15)
-        mid_frame.pack(side=tk.LEFT, fill=tk.BOTH, expand=True, padx=(0, 10))
+        mid_frame.grid(row=0, column=1, sticky="nsew", padx=(0, 10))
+        mid_frame.columnconfigure(0, weight=1)
+        
+        # 设置最小宽度避免内容被遮盖
+        mid_frame.configure(width=300)
 
         # 按钮
         btn_frame = ttk.Frame(mid_frame)
@@ -154,7 +181,11 @@ class MainWindow:
     def _setup_right_panel(self, parent):
         """右侧面板 - 文件列表"""
         right_frame = ttk.LabelFrame(parent, text="第3步: 勾选需要复制的文件", padding=15)
-        right_frame.pack(side=tk.LEFT, fill=tk.BOTH, expand=True)
+        right_frame.grid(row=0, column=2, sticky="nsew")
+        right_frame.columnconfigure(0, weight=1)
+        
+        # 设置最小宽度避免内容被遮盖
+        right_frame.configure(width=300)
 
         # 按钮 - 放在标题下面
         btn_frame = ttk.Frame(right_frame)
@@ -200,20 +231,29 @@ class MainWindow:
         help_label.pack(anchor=tk.W, pady=(5, 0))
 
     def _setup_bottom_panel(self):
-        """底部按钮"""
+        """底部按钮 - 三栏卡片式布局"""
         bottom_frame = ttk.Frame(self.root)
         bottom_frame.pack(fill=tk.X, padx=20, pady=15)
 
-        tk.Button(bottom_frame, text="从Excel创建文件夹", font=("微软雅黑", 12, "bold"),
-                  bg="#4CAF50", fg="white", height=2, command=self._on_create_from_excel).pack(
-            side=tk.LEFT, expand=True, fill=tk.X, ipadx=15, padx=(0, 10))
+        # 使用grid布局确保三个按钮长度一致
+        bottom_frame.columnconfigure(0, weight=1, uniform="button_col")
+        bottom_frame.columnconfigure(1, weight=1, uniform="button_col")
+        bottom_frame.columnconfigure(2, weight=1, uniform="button_col")
 
-        tk.Button(bottom_frame, text="复制文件到选中文件夹", font=("微软雅黑", 12, "bold"),
-                  bg="#FF9800", fg="white", height=2, command=self._on_copy_files).pack(
-            side=tk.LEFT, expand=True, fill=tk.X, ipadx=15, padx=(0, 10))
+        # 按钮1：从Excel创建文件夹
+        btn1 = tk.Button(bottom_frame, text="从Excel创建文件夹", font=("微软雅黑", 12, "bold"),
+                        bg="#4CAF50", fg="white", height=2, command=self._on_create_from_excel)
+        btn1.grid(row=0, column=0, sticky="ew", padx=(0, 10))
 
-        tk.Button(bottom_frame, text="Word转PDF", font=("微软雅黑", 11),
-                  bg="#E91E63", fg="white", height=2, command=self._on_show_pdf_dialog).pack(side=tk.LEFT, ipadx=15)
+        # 按钮2：复制文件到选中文件夹
+        btn2 = tk.Button(bottom_frame, text="复制文件到选中文件夹", font=("微软雅黑", 12, "bold"),
+                        bg="#FF9800", fg="white", height=2, command=self._on_copy_files)
+        btn2.grid(row=0, column=1, sticky="ew", padx=(0, 10))
+
+        # 按钮3：Word转PDF
+        btn3 = tk.Button(bottom_frame, text="Word转PDF", font=("微软雅黑", 12, "bold"),
+                        bg="#E91E63", fg="white", height=2, command=self._on_show_pdf_dialog)
+        btn3.grid(row=0, column=2, sticky="ew")
 
     def _setup_result_panel(self):
         """结果面板"""
@@ -491,60 +531,156 @@ class MainWindow:
         return folders
 
     def _on_show_pdf_dialog(self):
-        """显示PDF转换对话框"""
+        """显示PDF转换对话框 - 简化可靠版本"""
         dialog = tk.Toplevel(self.root)
         dialog.title("Word转PDF")
-        dialog.geometry("500x350")
+        
+        # 简化界面尺寸
+        dialog.geometry("700x600")
+        dialog.minsize(600, 400)
         dialog.transient(self.root)
         dialog.grab_set()
+        
+        # 配置网格权重
+        dialog.columnconfigure(0, weight=1)
+        dialog.rowconfigure(0, weight=0)  # 标题
+        dialog.rowconfigure(1, weight=0)  # 设置
+        dialog.rowconfigure(2, weight=0)  # 按钮
+        dialog.rowconfigure(3, weight=1)  # 结果
 
-        tk.Label(dialog, text="源文件夹:").pack(pady=(20, 5), padx=20, anchor=tk.W)
-        source_frame = ttk.Frame(dialog)
-        source_frame.pack(fill=tk.X, padx=20)
+        # 标题
+        title_frame = ttk.Frame(dialog)
+        title_frame.grid(row=0, column=0, sticky="ew", padx=20, pady=10)
+        tk.Label(title_frame, text="Word转PDF转换", font=("微软雅黑", 16, "bold"), 
+                foreground="#E91E63").pack()
+
+        # 设置区域
+        settings_frame = ttk.LabelFrame(dialog, text="转换设置", padding=15)
+        settings_frame.grid(row=1, column=0, sticky="ew", padx=20, pady=10)
+        settings_frame.columnconfigure(0, weight=1)
+
+        # 源文件夹
         source_var = tk.StringVar()
-        ttk.Entry(source_frame, textvariable=source_var, width=40).pack(side=tk.LEFT, padx=5)
+        tk.Label(settings_frame, text="源文件夹:", font=("微软雅黑", 10)).grid(row=0, column=0, sticky="w", pady=5)
+        
+        source_frame = ttk.Frame(settings_frame)
+        source_frame.grid(row=1, column=0, sticky="ew", pady=5)
+        source_frame.columnconfigure(0, weight=1)
+        
+        ttk.Entry(source_frame, textvariable=source_var, width=50).grid(row=0, column=0, sticky="ew", padx=(0, 10))
         tk.Button(source_frame, text="选择", bg="#2196F3", fg="white",
-                  command=lambda: self._select_folder(source_var)).pack(side=tk.LEFT)
+                  command=lambda: self._select_folder(source_var)).grid(row=0, column=1)
 
-        tk.Label(dialog, text="输出文件夹:").pack(pady=(15, 5), padx=20, anchor=tk.W)
-        output_frame = ttk.Frame(dialog)
-        output_frame.pack(fill=tk.X, padx=20)
+        # 输出文件夹
         output_var = tk.StringVar(value=DESKTOP)
-        ttk.Entry(output_frame, textvariable=output_var, width=40).pack(side=tk.LEFT, padx=5)
+        tk.Label(settings_frame, text="输出文件夹:", font=("微软雅黑", 10)).grid(row=2, column=0, sticky="w", pady=5)
+        
+        output_frame = ttk.Frame(settings_frame)
+        output_frame.grid(row=3, column=0, sticky="ew", pady=5)
+        output_frame.columnconfigure(0, weight=1)
+        
+        ttk.Entry(output_frame, textvariable=output_var, width=50).grid(row=0, column=0, sticky="ew", padx=(0, 10))
         tk.Button(output_frame, text="选择", bg="#2196F3", fg="white",
-                  command=lambda: self._select_folder(output_var)).pack(side=tk.LEFT)
+                  command=lambda: self._select_folder(output_var)).grid(row=0, column=1)
 
+        # 选项
         keep_var = tk.BooleanVar(value=True)
-        ttk.Checkbutton(dialog, text="保持原文件夹结构", variable=keep_var).pack(pady=15, anchor=tk.W, padx=20)
-        tk.Label(dialog, text="注意: 需要安装Microsoft Word", foreground="red").pack(anchor=tk.W, padx=20)
+        auto_wrap_var = tk.BooleanVar(value=True)
+        
+        option_frame = ttk.Frame(settings_frame)
+        option_frame.grid(row=4, column=0, sticky="w", pady=10)
+        
+        ttk.Checkbutton(option_frame, text="保持文件夹结构", variable=keep_var).pack(side=tk.LEFT, padx=(0, 20))
+        ttk.Checkbutton(option_frame, text="自动创建顶层文件夹", variable=auto_wrap_var).pack(side=tk.LEFT)
 
-        tk.Button(dialog, text="开始转换", bg="#E91E63", fg="white", font=("微软雅黑", 12, "bold"),
-                  command=lambda: self._convert_pdf(dialog, source_var.get(), output_var.get(),
-                                                    keep_var.get())).pack(pady=20, ipadx=30)
+        # 转换按钮 - 绝对可见
+        button_frame = ttk.Frame(dialog)
+        button_frame.grid(row=2, column=0, sticky="ew", padx=20, pady=10)
+        button_frame.columnconfigure(0, weight=1)
+        
+        # 醒目的转换按钮
+        convert_btn = tk.Button(button_frame, text="🚀 开始转换", bg="#E91E63", fg="white", 
+                               font=("微软雅黑", 12, "bold"), height=2,
+                               command=lambda: self._convert_pdf_check(dialog, source_var, output_var, 
+                                                                       keep_var.get(), auto_wrap_var.get()))
+        convert_btn.pack(fill=tk.X, expand=True)
 
-        result_text = tk.Text(dialog, height=8, width=50)
-        result_text.pack(pady=10, padx=20, fill=tk.BOTH, expand=True)
+        # 状态显示
+        status_var = tk.StringVar(value="准备就绪")
+        status_label = tk.Label(button_frame, textvariable=status_var, foreground="blue", 
+                               font=("微软雅黑", 9))
+        status_label.pack(pady=5)
+        
+        # 结果区域
+        result_frame = ttk.LabelFrame(dialog, text="转换结果", padding=10)
+        result_frame.grid(row=3, column=0, sticky="nsew", padx=20, pady=10)
+        result_frame.columnconfigure(0, weight=1)
+        result_frame.rowconfigure(0, weight=1)
+        
+        result_text = tk.Text(result_frame, font=("微软雅黑", 9), wrap=tk.WORD)
+        result_text.grid(row=0, column=0, sticky="nsew")
+        
+        scrollbar = ttk.Scrollbar(result_frame, orient=tk.VERTICAL, command=result_text.yview)
+        scrollbar.grid(row=0, column=1, sticky="ns")
+        result_text.configure(yscrollcommand=scrollbar.set)
+        
         dialog.result_text = result_text
+        dialog.status_var = status_var
 
     def _select_folder(self, var):
         path = filedialog.askdirectory()
         if path:
             var.set(path)
 
-    def _convert_pdf(self, dialog, source, output, keep):
+    def _convert_pdf_check(self, dialog, source_var, output_var, keep, auto_wrap):
+        """转换前检查"""
+        source = source_var.get().strip()
+        output = output_var.get().strip()
+        
+        # 检查源文件夹
         if not source:
+            dialog.status_var.set("❌ 请选择源文件夹")
             messagebox.showwarning("警告", "请选择源文件夹！")
             return
+            
+        if not os.path.exists(source):
+            dialog.status_var.set("❌ 源文件夹不存在")
+            messagebox.showerror("错误", f"源文件夹不存在: {source}")
+            return
+            
+        # 检查Word转换器是否可用
+        if not self.word_converter.is_available():
+            dialog.status_var.set("❌ Word转换器不可用")
+            messagebox.showerror("错误", "Word转换器不可用，请检查pywin32和comtypes库的安装")
+            return
+            
+        dialog.status_var.set("🔄 正在转换中...")
+        self._convert_pdf(dialog, source, output, keep, auto_wrap)
 
+    def _convert_pdf(self, dialog, source, output, keep, auto_wrap):
+        """执行PDF转换"""
         try:
-            results, success, fail = self.word_converter.convert_folder(source, output, keep)
+            results, success, fail = self.word_converter.convert_folder(source, output, keep, auto_wrap)
             dialog.result_text.delete(1.0, tk.END)
             dialog.result_text.insert(tk.END, "\n".join(results))
+            
+            # 滚动到顶部
+            dialog.result_text.see("1.0")
+            
+            dialog.status_var.set(f"✅ 转换完成: 成功{success}, 失败{fail}")
             messagebox.showinfo("完成", f"转换成功: {success}, 失败: {fail}")
+            
         except ImportError:
+            dialog.status_var.set("❌ 依赖库缺失")
             messagebox.showerror("错误", "需要安装 pywin32 和 comtypes 库！")
+        except FileNotFoundError as e:
+            dialog.status_var.set("❌ 文件路径错误")
+            messagebox.showerror("错误", f"路径错误: {str(e)}")
         except Exception as e:
-            messagebox.showerror("错误", f"转换失败: {str(e)}")
+            dialog.status_var.set("❌ 转换失败")
+            error_msg = f"转换失败: {str(e)}"
+            logger.error(error_msg)
+            messagebox.showerror("错误", error_msg)
 
     def _log(self, message):
         """显示日志"""

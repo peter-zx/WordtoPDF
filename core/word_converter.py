@@ -23,7 +23,7 @@ class WordConverter:
         """检查是否可用"""
         return self.comtypes_available
 
-    def convert_folder(self, source_folder, output_folder, keep_structure=True):
+    def convert_folder(self, source_folder, output_folder, keep_structure=True, auto_wrap_folder=True):
         """转换文件夹中的Word文档"""
         if not self.comtypes_available:
             raise ImportError("需要安装 pywin32 和 comtypes 库")
@@ -38,6 +38,12 @@ class WordConverter:
         results = []
         success = 0
         fail = 0
+        
+        # 自动创建顶层文件夹
+        if auto_wrap_folder:
+            source_folder_name = os.path.basename(source_folder.rstrip(os.sep))
+            output_folder = os.path.join(output_folder, f"{source_folder_name}_PDF输出")
+            results.append(f"📁 输出文件夹: {output_folder}")
 
         try:
             for root, dirs, files in os.walk(source_folder):
@@ -67,7 +73,13 @@ class WordConverter:
                             word.Quit()
 
                             success += 1
-                            results.append(f"✓ {file} -> {pdf_name}")
+                            
+                            # 显示相对路径，更清晰
+                            if keep_structure:
+                                rel_dest = os.path.relpath(dest_path, output_folder)
+                                results.append(f"✓ {file} -> {rel_dest}")
+                            else:
+                                results.append(f"✓ {file} -> {pdf_name}")
 
                         except Exception as e:
                             fail += 1
@@ -78,5 +90,13 @@ class WordConverter:
                 pythoncom.CoUninitialize()
             except:
                 pass
+
+        # 添加总结信息
+        if auto_wrap_folder:
+            results.append(f"\n📊 转换统计:")
+            results.append(f"   输出位置: {output_folder}")
+            results.append(f"   成功: {success} 个文件")
+            results.append(f"   失败: {fail} 个文件")
+            results.append(f"   总计: {success + fail} 个文件")
 
         return results, success, fail
