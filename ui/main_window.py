@@ -583,12 +583,31 @@ class MainWindow:
         tk.Button(output_frame, text="选择", bg="#2196F3", fg="white",
                   command=lambda: self._select_folder(output_var)).grid(row=0, column=1)
 
+        # 安装状态显示
+        status_frame = ttk.Frame(settings_frame)
+        status_frame.grid(row=4, column=0, sticky="ew", pady=5)
+        status_frame.columnconfigure(0, weight=1)
+        
+        # 检查转换器状态
+        converter_info = self.word_converter.get_converter_info()
+        status_text = "✅ Word转换器可用" if converter_info["win32com_available"] else "❌ 需要安装pywin32库"
+        status_color = "green" if converter_info["win32com_available"] else "red"
+        
+        tk.Label(status_frame, text="安装状态:", font=("微软雅黑", 10, "bold")).grid(row=0, column=0, sticky="w")
+        tk.Label(status_frame, text=status_text, foreground=status_color, 
+                font=("微软雅黑", 10)).grid(row=0, column=1, sticky="w", padx=(10, 0))
+        
+        if not converter_info["win32com_available"]:
+            install_btn = tk.Button(status_frame, text="查看安装说明", bg="#FF9800", fg="white",
+                                   command=self._show_install_instructions)
+            install_btn.grid(row=0, column=2, padx=(20, 0))
+
         # 选项
         keep_var = tk.BooleanVar(value=True)
         auto_wrap_var = tk.BooleanVar(value=True)
         
         option_frame = ttk.Frame(settings_frame)
-        option_frame.grid(row=4, column=0, sticky="w", pady=10)
+        option_frame.grid(row=5, column=0, sticky="w", pady=10)
         
         ttk.Checkbutton(option_frame, text="保持文件夹结构", variable=keep_var).pack(side=tk.LEFT, padx=(0, 20))
         ttk.Checkbutton(option_frame, text="自动创建顶层文件夹", variable=auto_wrap_var).pack(side=tk.LEFT)
@@ -598,18 +617,40 @@ class MainWindow:
         button_frame.grid(row=2, column=0, sticky="ew", padx=20, pady=10)
         button_frame.columnconfigure(0, weight=1)
         
+        # 创建进度显示变量
+        progress_var = tk.StringVar(value="准备转换")
+        
+        # 进度条
+        progress_frame = ttk.Frame(button_frame)
+        progress_frame.pack(fill=tk.X, pady=(0, 10))
+        
+        progress_label = tk.Label(progress_frame, textvariable=progress_var, 
+                                 foreground="blue", font=("微软雅黑", 10, "bold"))
+        progress_label.pack()
+        
+        # 进度条控件
+        progress_bar = ttk.Progressbar(progress_frame, orient="horizontal", 
+                                      length=400, mode="determinate")
+        progress_bar.pack(fill=tk.X, pady=5)
+        
         # 醒目的转换按钮
         convert_btn = tk.Button(button_frame, text="🚀 开始转换", bg="#E91E63", fg="white", 
                                font=("微软雅黑", 12, "bold"), height=2,
                                command=lambda: self._convert_pdf_check(dialog, source_var, output_var, 
-                                                                       keep_var.get(), auto_wrap_var.get()))
+                                                                       keep_var.get(), auto_wrap_var.get(),
+                                                                       progress_var, progress_bar))
         convert_btn.pack(fill=tk.X, expand=True)
 
         # 状态显示
         status_var = tk.StringVar(value="准备就绪")
-        status_label = tk.Label(button_frame, textvariable=status_var, foreground="blue", 
+        status_label = tk.Label(button_frame, textvariable=status_var, foreground="green", 
                                font=("微软雅黑", 9))
         status_label.pack(pady=5)
+        
+        # 保存进度控件到对话框
+        dialog.progress_var = progress_var
+        dialog.progress_bar = progress_bar
+        dialog.status_var = status_var
         
         # 结果区域
         result_frame = ttk.LabelFrame(dialog, text="转换结果", padding=10)
@@ -631,53 +672,124 @@ class MainWindow:
         path = filedialog.askdirectory()
         if path:
             var.set(path)
+    
+    def _show_install_instructions(self):
+        """显示安装说明"""
+        instructions = """📋 安装依赖库说明
 
-    def _convert_pdf_check(self, dialog, source_var, output_var, keep, auto_wrap):
+需要安装以下库才能使用Word转PDF功能：
+
+1. 安装 pywin32（推荐使用pip安装）
+   打开命令提示符(CMD)或PowerShell，运行：
+   pip install pywin32
+
+2. 如果安装失败，可以尝试：
+   pip install --upgrade pywin32
+
+3. 确保系统已安装 Microsoft Word
+
+安装完成后重启应用即可使用。"""
+        
+        messagebox.showinfo("安装说明", instructions)
+    
+    def _progress_callback(self, dialog, current, total, filename, success, error):
+        """进度回调函数"""
+        # 更新进度条
+        progress_percent = (current / total) * 100
+        dialog.progress_bar['value'] = progress_percent
+        
+        # 更新进度文本
+        status_icon = "✅" if success else "❌"
+        dialog.progress_var.set(f"{status_icon} [{current}/{total}] 正在转换: {filename}")
+        
+        # 更新状态
+        if success:
+            dialog.status_var.set(f"🔄 已转换 {current}/{total} 个文件")
+        else:
+            dialog.status_var.set(f"⚠️ 转换失败: {filename}")
+        
+        # 强制界面更新
+        dialog.update()
+
+    def _convert_pdf_check(self, dialog, source_var, output_var, keep, auto_wrap, progress_var, progress_bar):
         """转换前检查"""
         source = source_var.get().strip()
         output = output_var.get().strip()
         
+        # 重置进度条
+        progress_bar['value'] = 0
+        progress_var.set("准备转换...")
+        dialog.status_var.set("准备就绪")
+        
         # 检查源文件夹
         if not source:
             dialog.status_var.set("❌ 请选择源文件夹")
+            progress_var.set("❌ 请选择源文件夹")
             messagebox.showwarning("警告", "请选择源文件夹！")
             return
             
         if not os.path.exists(source):
             dialog.status_var.set("❌ 源文件夹不存在")
+            progress_var.set("❌ 源文件夹不存在")
             messagebox.showerror("错误", f"源文件夹不存在: {source}")
             return
             
         # 检查Word转换器是否可用
         if not self.word_converter.is_available():
             dialog.status_var.set("❌ Word转换器不可用")
-            messagebox.showerror("错误", "Word转换器不可用，请检查pywin32和comtypes库的安装")
+            progress_var.set("❌ 需要安装pywin32库")
+            messagebox.showerror("错误", "Word转换器不可用，请检查pywin32库的安装")
             return
             
         dialog.status_var.set("🔄 正在转换中...")
-        self._convert_pdf(dialog, source, output, keep, auto_wrap)
+        progress_var.set("🔄 正在扫描文件...")
+        
+        # 在新线程中执行转换
+        import threading
+        thread = threading.Thread(
+            target=self._convert_pdf, 
+            args=(dialog, source, output, keep, auto_wrap, progress_var, progress_bar)
+        )
+        thread.daemon = True
+        thread.start()
 
-    def _convert_pdf(self, dialog, source, output, keep, auto_wrap):
+    def _convert_pdf(self, dialog, source, output, keep, auto_wrap, progress_var, progress_bar):
         """执行PDF转换"""
         try:
-            results, success, fail = self.word_converter.convert_folder(source, output, keep, auto_wrap)
+            # 创建进度回调函数
+            def progress_callback(current, total, filename, success, error):
+                self._progress_callback(dialog, current, total, filename, success, error)
+            
+            # 执行转换
+            results, success, fail = self.word_converter.convert_folder(
+                source, output, keep, auto_wrap, progress_callback
+            )
+            
+            # 更新结果
             dialog.result_text.delete(1.0, tk.END)
             dialog.result_text.insert(tk.END, "\n".join(results))
             
             # 滚动到顶部
             dialog.result_text.see("1.0")
             
+            # 完成状态
+            progress_bar['value'] = 100
+            progress_var.set(f"✅ 转换完成: 成功{success}, 失败{fail}")
             dialog.status_var.set(f"✅ 转换完成: 成功{success}, 失败{fail}")
-            messagebox.showinfo("完成", f"转换成功: {success}, 失败: {fail}")
+            
+            messagebox.showinfo("完成", f"转换完成！\n成功: {success} 个文件\n失败: {fail} 个文件")
             
         except ImportError:
             dialog.status_var.set("❌ 依赖库缺失")
-            messagebox.showerror("错误", "需要安装 pywin32 和 comtypes 库！")
+            progress_var.set("❌ 需要安装pywin32库")
+            messagebox.showerror("错误", "需要安装 pywin32 库！")
         except FileNotFoundError as e:
             dialog.status_var.set("❌ 文件路径错误")
+            progress_var.set("❌ 文件路径错误")
             messagebox.showerror("错误", f"路径错误: {str(e)}")
         except Exception as e:
             dialog.status_var.set("❌ 转换失败")
+            progress_var.set("❌ 转换失败")
             error_msg = f"转换失败: {str(e)}"
             logger.error(error_msg)
             messagebox.showerror("错误", error_msg)
